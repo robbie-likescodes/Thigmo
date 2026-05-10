@@ -44,6 +44,9 @@ const renderer = new THREE.WebGLRenderer({ antialias: true });
 ui.viewport.appendChild(renderer.domElement);
 
 const controls = new OrbitControls(camera, renderer.domElement);
+controls.target.set(2.25, 0, 0.75);
+camera.lookAt(controls.target);
+controls.update();
 controls.enableDamping = true;
 controls.mouseButtons.LEFT = THREE.MOUSE.ROTATE;
 controls.mouseButtons.MIDDLE = THREE.MOUSE.PAN;
