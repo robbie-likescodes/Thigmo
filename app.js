@@ -77,6 +77,38 @@ function influencedTiles(player){
   return set;
 }
 
+
+function isOrthogonallyConnectedAfterMove(tid, toX, toY){
+  const occupied = new Map();
+  for (const [id, pos] of state.tiles) {
+    const x = id === tid ? toX : pos.x;
+    const y = id === tid ? toY : pos.y;
+    const k = key(x, y);
+    if (occupied.has(k)) return false;
+    occupied.set(k, id);
+  }
+
+  const coords = [...occupied.keys()];
+  if (coords.length !== state.tiles.size || coords.length === 0) return false;
+
+  const visited = new Set();
+  const queue = [coords[0]];
+  visited.add(coords[0]);
+
+  while (queue.length) {
+    const current = queue.shift();
+    const [x, y] = current.split(',').map(Number);
+    for (const [nx, ny] of [[x+1,y],[x-1,y],[x,y+1],[x,y-1]]) {
+      const nk = key(nx, ny);
+      if (!occupied.has(nk) || visited.has(nk)) continue;
+      visited.add(nk);
+      queue.push(nk);
+    }
+  }
+
+  return visited.size === state.tiles.size;
+}
+
 function legalMovesFor(player){
   const moves=[];
   const influenced = influencedTiles(player);
@@ -85,6 +117,7 @@ function legalMovesFor(player){
     if (!influenced.has(tid)) continue;
     for (const [nx,ny] of neighbors8(from.x,from.y)) {
       if (occ.has(key(nx,ny))) continue;
+      if (!isOrthogonallyConnectedAfterMove(tid, nx, ny)) continue;
       moves.push({ tid, from:{...from}, to:{x:nx,y:ny} });
     }
   }
@@ -259,6 +292,10 @@ canvas.addEventListener('click', (e)=>{
   }
   if(state.phase==='selectDest'){
     const m=nearestGhost(mx,my); if(!m) return;
+    if (hasTile(m.to.x, m.to.y) || !isOrthogonallyConnectedAfterMove(m.tid, m.to.x, m.to.y)) {
+      log('Illegal move: root network must remain orthogonally connected.');
+      return;
+    }
     state.undoSnapshot = snapshot();
     const p=state.tiles.get(m.tid); const fromK=key(p.x,p.y), toK=key(m.to.x,m.to.y); const stack=state.stacks.get(fromK);
     state.stacks.delete(fromK); state.stacks.set(toK,stack); p.x=m.to.x; p.y=m.to.y;
