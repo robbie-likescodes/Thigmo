@@ -217,7 +217,9 @@ function draw(){
     ctx.fillRect(sx-34,sy-34,68,68);
 
     if (state.phase === 'selectTile' && state.legalMoves.some(m=>m.tid===tid)) {
-      ctx.strokeStyle = 'rgba(255,255,255,0.75)'; ctx.lineWidth = 3; ctx.strokeRect(sx-36,sy-36,72,72);
+      ctx.strokeStyle = state.turn === 'orange' ? 'rgba(255,159,28,0.85)' : 'rgba(122,60,255,0.85)';
+      ctx.lineWidth = 3;
+      ctx.strokeRect(sx-36,sy-36,72,72);
     }
 
     const stack = state.stacks.get(key(pos.x,pos.y)) || [];
