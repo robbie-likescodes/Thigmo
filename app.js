@@ -1,15 +1,12 @@
-window.THIGMO_BUILD = '2026-05-10-playable-2d';
-
+window.THIGMO_BUILD = '2026-05-10-polish-audit';
 const WIN_CAPTURES = 10;
+const MAX_STACK = 7;
 const ui = {
-  viewport: document.getElementById('viewport'),
-  scorePurple: document.getElementById('score-purple'),
-  scoreOrange: document.getElementById('score-orange'),
-  turnInfo: document.getElementById('turn-info'),
-  libertyToggle: document.getElementById('liberty-toggle'),
-  spacing: document.getElementById('spacing'),
-  undoBtn: document.getElementById('undo-btn'),
-  log: document.getElementById('log'),
+  viewport: document.getElementById('viewport'), scorePurple: document.getElementById('score-purple'), scoreOrange: document.getElementById('score-orange'),
+  turnInfo: document.getElementById('turn-info'), undoBtn: document.getElementById('undo-btn'), log: document.getElementById('log'),
+  phaseBadge: document.getElementById('phase-badge'), feedback: document.getElementById('feedback'), showCoords: document.getElementById('show-coords'),
+  showLiberties: document.getElementById('show-liberties'), debugOutput: document.getElementById('debug-output'), runAudit: document.getElementById('run-audit'),
+  winModal: document.getElementById('win-modal'), winTitle: document.getElementById('win-title')
 };
 
 const state = {
