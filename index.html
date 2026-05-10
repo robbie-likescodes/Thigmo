@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Thigmo v1</title>
+  <title>Thigmo v2</title>
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
@@ -16,8 +16,6 @@
       </div>
       <div class="turn-info" id="turn-info">Purple Turn · Move a tile</div>
       <div class="controls-inline">
-        <label>Liberty Assist <input id="liberty-toggle" type="checkbox" checked /></label>
-        <label>Spacing <input id="spacing" type="range" min="0" max="10" value="4" /></label>
         <button id="undo-btn">Undo Turn</button>
       </div>
     </header>
@@ -25,15 +23,38 @@
     <div id="viewport"></div>
 
     <aside class="side-panel">
-      <h3>How to Play</h3>
-      <ol>
-        <li>Click a highlighted tile to move.</li>
-        <li>Click a ghost destination square.</li>
-        <li>Click any dirt tile to place a flower.</li>
-      </ol>
+      <section class="card">
+        <h3>Game Status</h3>
+        <div id="phase-badge" class="phase-badge">Move Phase</div>
+        <div id="feedback" class="feedback">Ready.</div>
+      </section>
+
+      <section class="card">
+        <h3>Legend</h3>
+        <ul class="legend">
+          <li><span class="swatch movable"></span> Movable tile</li>
+          <li><span class="swatch ghost"></span> Legal destination</li>
+          <li><span class="swatch place"></span> Legal placement</li>
+          <li><span class="swatch liberty"></span> Liberty / sunlight</li>
+        </ul>
+      </section>
+
+      <section class="card">
+        <h3>Event Log</h3>
+        <div id="log"></div>
+      </section>
+
+      <details class="card" id="debug-panel">
+        <summary><strong>Debug Panel</strong></summary>
+        <div class="debug-grid">
+          <label><input id="show-coords" type="checkbox" /> Show coordinates</label>
+          <label><input id="show-liberties" type="checkbox" /> Show liberties (selected group)</label>
+          <button id="run-audit">Run rules audit</button>
+        </div>
+        <pre id="debug-output"></pre>
+      </details>
+
       <p>Version: <code id="build-id">loading…</code></p>
-      <h3>Event Log</h3>
-      <div id="log"></div>
     </aside>
   </div>
 
