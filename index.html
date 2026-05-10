@@ -40,6 +40,29 @@
     <div id="axis-cube"></div>
   </div>
 
-  <script type="module" src="app.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.166.1/build/three.min.js?v=20260511"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.166.1/examples/js/controls/OrbitControls.js?v=20260511"></script>
+  <script>
+    window.addEventListener('error', (e) => {
+      const msg = String(e.message || '');
+      if (!/three|module/i.test(msg)) return;
+      const vp = document.getElementById('viewport');
+      if (!vp || document.getElementById('thigmo-fallback')) return;
+      const box = document.createElement('div');
+      box.id = 'thigmo-fallback';
+      box.style.cssText = 'position:absolute;inset:0;display:grid;place-items:center;background:#bfe3b2;';
+      box.innerHTML = `
+        <div style="background:#fff;padding:14px 16px;border-radius:12px;border:1px solid #8cab81;max-width:560px">
+          <h3 style="margin:0 0 8px">Renderer failed to load</h3>
+          <p style="margin:0 0 8px;font-size:14px">A cached or incompatible script prevented the 3D engine from starting.</p>
+          <p style="margin:0 0 10px;font-size:13px"><code>${msg.replace(/</g, '&lt;')}</code></p>
+          <button id="retry-btn" style="padding:8px 10px;border-radius:8px;border:1px solid #7f9d74">Hard reload page</button>
+        </div>`;
+      vp.style.position = 'relative';
+      vp.appendChild(box);
+      document.getElementById('retry-btn')?.addEventListener('click', () => location.reload(true));
+    });
+  </script>
+  <script src="app.js?v=20260511" defer></script>
 </body>
 </html>

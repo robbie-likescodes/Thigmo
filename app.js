@@ -1,7 +1,5 @@
-import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.166.1/build/three.module.js';
-import { OrbitControls } from 'https://cdn.jsdelivr.net/npm/three@0.166.1/examples/jsm/controls/OrbitControls.js';
-
 const COLORS = { purple: 0x7a3cff, orange: 0xff9f1c, greenAssist: 0x4bd96b };
+window.THIGMO_BUILD = '2026-05-10-b';
 const TILE_SIZE = 1.25;
 const LEVEL_H = 0.62;
 const WIN_CAPTURES = 10;
@@ -43,7 +41,7 @@ camera.position.set(6.5, 6.5, 6.5);
 const renderer = new THREE.WebGLRenderer({ antialias: true });
 ui.viewport.appendChild(renderer.domElement);
 
-const controls = new OrbitControls(camera, renderer.domElement);
+const controls = new THREE.OrbitControls(camera, renderer.domElement);
 controls.enableDamping = true;
 controls.mouseButtons.LEFT = THREE.MOUSE.ROTATE;
 controls.mouseButtons.MIDDLE = THREE.MOUSE.PAN;
