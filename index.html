@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Thigmo v1</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div id="app-shell">
+    <header class="top-bar">
+      <div class="brand">🌸 Thigmo</div>
+      <div class="scoreboard">
+        <span class="pill purple">Purple captures: <strong id="score-purple">0</strong></span>
+        <span class="pill orange">Orange captures: <strong id="score-orange">0</strong></span>
+      </div>
+      <div class="turn-info" id="turn-info">Purple Turn · Move a tile</div>
+      <div class="controls-inline">
+        <label>Liberty Assist <input id="liberty-toggle" type="checkbox" checked /></label>
+        <label>Spacing <input id="spacing" type="range" min="0" max="10" value="4" /></label>
+        <button id="undo-btn">Undo Turn</button>
+      </div>
+    </header>
+
+    <div id="viewport"></div>
+
+    <aside class="side-panel">
+      <h3>How to Play</h3>
+      <ol>
+        <li>Click a legal tile to move.</li>
+        <li>Click a ghost patch destination.</li>
+        <li>Click any tile to place (watering animation).</li>
+      </ol>
+      <p>Camera: left-drag rotate · wheel zoom · shift+drag pan.</p>
+      <p>Click axis cube faces to snap view.</p>
+      <h3>Event Log</h3>
+      <div id="log"></div>
+    </aside>
+
+    <div id="axis-cube"></div>
+  </div>
+
+  <script type="module" src="app.js"></script>
+</body>
+</html>
