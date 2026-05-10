@@ -1,4 +1,5 @@
-window.THIGMO_BUILD = '2026-05-10-polish-audit';
+window.THIGMO_BUILD = '2026-05-10-botanical-overhaul';
+
 const WIN_CAPTURES = 10;
 const MAX_STACK = 7;
 const ui = {
@@ -8,50 +9,128 @@ const ui = {
   showLiberties: document.getElementById('show-liberties'), debugOutput: document.getElementById('debug-output'), runAudit: document.getElementById('run-audit'),
   winModal: document.getElementById('win-modal'), winTitle: document.getElementById('win-title')
 };
-const state={turn:'purple',phase:'selectTile',tiles:new Map(),stacks:new Map(),captures:{purple:0,orange:0},selectedTileId:null,legalMoves:[],undoSnapshot:null,winner:null,tileSpacing:88,captureFx:[],hoverTile:null};
-const canvas=document.createElement('canvas');canvas.width=1280;canvas.height=840;canvas.style.width='100%';canvas.style.height='100%';ui.viewport.appendChild(canvas);const ctx=canvas.getContext('2d');
-const key=(x,y)=>`${x},${y}`; const other=(p)=>p==='purple'?'orange':'purple'; const ckey=(x,y,z)=>`${x},${y},${z}`;
-const n8=(x,y)=>{const a=[];for(let dx=-1;dx<=1;dx++)for(let dy=-1;dy<=1;dy++)if(dx||dy)a.push([x+dx,y+dy]);return a;};
-const n6=(x,y,z)=>[[x+1,y,z],[x-1,y,z],[x,y+1,z],[x,y-1,z],[x,y,z+1],[x,y,z-1]];
-function log(msg,type=''){const d=document.createElement('div');d.className=`log-entry ${type}`;d.textContent=msg;ui.log.prepend(d);}
-function setFeedback(msg){ui.feedback.textContent=msg;}
-function init(){let id=0;for(let y=0;y<2;y++)for(let x=0;x<4;x++){const tid=`t${id++}`;state.tiles.set(tid,{x,y});state.stacks.set(key(x,y),[]);}refresh();}
-function snapshot(){return {turn:state.turn,phase:state.phase,captures:{...state.captures},selectedTileId:state.selectedTileId,tiles:new Map([...state.tiles].map(([k,v])=>[k,{...v}])),stacks:new Map([...state.stacks].map(([k,v])=>[k,[...v]])),winner:state.winner};}
-function restore(s){Object.assign(state,s);refresh();}
-function hasTile(x,y){for(const t of state.tiles.values())if(t.x===x&&t.y===y)return true;return false;}
-function orthAdjacentToAnyTile(x,y){for(const [dx,dy] of [[1,0],[-1,0],[0,1],[0,-1]]) if(hasTile(x+dx,y+dy)) return true; return false;}
-function orthAdjacentInSet(x,y,occupied){for(const [dx,dy] of [[1,0],[-1,0],[0,1],[0,-1]]) if(occupied.has(key(x+dx,y+dy))) return true; return false;}
-function influencedTiles(player){const out=new Set();for(const [tid,p] of state.tiles){if((state.stacks.get(key(p.x,p.y))||[]).includes(player)){out.add(tid);continue;}for(const [nx,ny] of n8(p.x,p.y)){if((state.stacks.get(key(nx,ny))||[]).includes(player)){out.add(tid);break;}}}return out;}
-function legalMovesFor(player){const out=[],infl=influencedTiles(player),occ=new Set([...state.tiles.values()].map(t=>key(t.x,t.y)));for(const [tid,from] of state.tiles){if(!infl.has(tid))continue;for(const [nx,ny] of n8(from.x,from.y)){if(occ.has(key(nx,ny)))continue;if(!orthAdjacentToAnyTile(nx,ny))continue;const movedOcc=new Set(occ);movedOcc.delete(key(from.x,from.y));movedOcc.add(key(nx,ny));let createsIsolatedTile=false;for(const pos of movedOcc){const [tx,ty]=pos.split(',').map(Number);if(!orthAdjacentInSet(tx,ty,movedOcc)){createsIsolatedTile=true;break;}}if(createsIsolatedTile)continue;out.push({tid,from:{...from},to:{x:nx,y:ny}});}}return out;}
-function getOcc(){const o=new Map();for(const [kxy,stack] of state.stacks){const [x,y]=kxy.split(',').map(Number);stack.forEach((p,z)=>o.set(ckey(x,y,z),p));}return o;}
-function groupFrom(start,occ){const color=occ.get(start),q=[start],seen=new Set([start]),out=[];while(q.length){const c=q.pop();out.push(c);const [x,y,z]=c.split(',').map(Number);for(const [nx,ny,nz] of n6(x,y,z)){const nk=ckey(nx,ny,nz);if(!seen.has(nk)&&occ.get(nk)===color){seen.add(nk);q.push(nk);}}}return out;}
-// Liberties are computed in 3D using ONLY orthogonal 6-neighbor adjacency.
-// Horizontal liberties require a tile to physically exist at that (x,y) coordinate.
-function liberties(group,occ){const libs=new Set();for(const c of group){const [x,y,z]=c.split(',').map(Number);for(const [nx,ny,nz] of n6(x,y,z)){if(nz<0)continue;if((nx!==x||ny!==y)&&!hasTile(nx,ny))continue;const nk=ckey(nx,ny,nz);if(!occ.has(nk))libs.add(nk);}}return libs;}
-function removeCells(cells){const by=new Map();for(const c of cells){const [x,y,z]=c.split(',').map(Number);const k=key(x,y);if(!by.has(k))by.set(k,[]);by.get(k).push(z);}for(const [k,zs] of by){const s=state.stacks.get(k)||[];state.stacks.set(k,s.filter((_,i)=>!zs.includes(i)));}}
-function resolveCaptures(active){let changed=true;while(changed){changed=false;const occ=getOcc(),seen=new Set(),groups={purple:[],orange:[]};for(const c of occ.keys()){if(seen.has(c))continue;const g=groupFrom(c,occ);g.forEach(v=>seen.add(v));groups[occ.get(c)].push(g);}const remEnemy=[];for(const g of groups[other(active)])if(liberties(g,occ).size===0)remEnemy.push(...g);if(remEnemy.length){removeCells(remEnemy);state.captures[active]+=remEnemy.length;state.captureFx=remEnemy.map(c=>({c,t:20}));log(`${active} captured ${remEnemy.length} piece(s).`,'log-capture');changed=true;}const occ2=getOcc(),seen2=new Set(),remOwn=[];for(const c of occ2.keys()){if(seen2.has(c)||occ2.get(c)!==active)continue;const g=groupFrom(c,occ2);g.forEach(v=>seen2.add(v));if(liberties(g,occ2).size===0)remOwn.push(...g);}if(remOwn.length){removeCells(remOwn);log(`${active} self-capture triggered (${remOwn.length}).`,'log-capture');changed=true;}}}
-function worldToScreen(x,y){return {sx:canvas.width*0.42+x*state.tileSpacing,sy:canvas.height*0.52+y*state.tileSpacing*0.84};}
-function drawPiece(sx,sy,p,z){const y=sy-z*14;ctx.strokeStyle='rgba(0,0,0,.25)';ctx.fillStyle='rgba(0,0,0,.2)';ctx.beginPath();ctx.ellipse(sx,y+8,11,4,0,0,Math.PI*2);ctx.fill();ctx.lineWidth=1.5;const c=p==='purple'?'#7b3eff':'#ff9c1f';ctx.fillStyle=c;for(let i=0;i<6;i++){const a=i*Math.PI/3;ctx.beginPath();ctx.ellipse(sx+Math.cos(a)*7,y+Math.sin(a)*7,5,3,a,0,Math.PI*2);ctx.fill();}ctx.beginPath();ctx.arc(sx,y,5,0,Math.PI*2);ctx.fillStyle='#ffe9a8';ctx.fill();ctx.stroke();}
-function draw(){ctx.clearRect(0,0,canvas.width,canvas.height);ctx.fillStyle='#bfe4aa';ctx.fillRect(0,0,canvas.width,canvas.height);for(const [tid,p] of state.tiles){const {sx,sy}=worldToScreen(p.x,p.y);const g=ctx.createLinearGradient(sx-34,sy-34,sx+34,sy+34);g.addColorStop(0,'#8b5c33');g.addColorStop(1,'#6f4525');ctx.fillStyle=g;ctx.fillRect(sx-34,sy-34,68,68);ctx.strokeStyle='#4d2d15';ctx.strokeRect(sx-34,sy-34,68,68);if(state.phase==='selectTile'&&state.legalMoves.some(m=>m.tid===tid)){ctx.strokeStyle='#b7efff';ctx.lineWidth=3;ctx.strokeRect(sx-37,sy-37,74,74);}if(state.selectedTileId===tid){ctx.strokeStyle='#fff';ctx.strokeRect(sx-40,sy-40,80,80);}const stack=state.stacks.get(key(p.x,p.y))||[];stack.forEach((pl,z)=>drawPiece(sx,sy,pl,z));ctx.fillStyle='#fff';ctx.font='11px sans-serif';ctx.fillText(String(stack.length),sx+23,sy-20);if(ui.showCoords.checked){ctx.fillStyle='#132';ctx.fillText(`(${p.x},${p.y})`,sx-20,sy+46);} }
-  if(state.phase==='selectDest'&&state.selectedTileId){for(const m of state.legalMoves.filter(v=>v.tid===state.selectedTileId)){const {sx,sy}=worldToScreen(m.to.x,m.to.y);ctx.fillStyle='rgba(206,176,255,.45)';ctx.fillRect(sx-30,sy-30,60,60);}}
-  if(state.phase==='place'){for(const p of state.tiles.values()){const {sx,sy}=worldToScreen(p.x,p.y);const s=state.stacks.get(key(p.x,p.y))||[];if(s.length<MAX_STACK){ctx.strokeStyle='rgba(255,190,120,.8)';ctx.strokeRect(sx-35,sy-35,70,70);}}}
-  if(ui.showLiberties.checked&&state.selectedTileId){const t=state.tiles.get(state.selectedTileId);if(t){const occ=getOcc();const stack=state.stacks.get(key(t.x,t.y))||[];if(stack.length){const start=ckey(t.x,t.y,stack.length-1);const g=groupFrom(start,occ),libs=liberties(g,occ);ctx.fillStyle='rgba(90,240,140,.7)';for(const l of libs){const [x,y,z]=l.split(',').map(Number);const {sx,sy}=worldToScreen(x,y);ctx.beginPath();ctx.arc(sx,sy-z*14,6,0,Math.PI*2);ctx.fill();}}}}
-  state.captureFx=state.captureFx.filter(f=>f.t-->0);for(const fx of state.captureFx){const [x,y,z]=fx.c.split(',').map(Number);const {sx,sy}=worldToScreen(x,y);ctx.strokeStyle=`rgba(255,80,80,${fx.t/20})`;ctx.lineWidth=3;ctx.beginPath();ctx.arc(sx,sy-z*14,14+(20-fx.t),0,Math.PI*2);ctx.stroke();}
+
+const state = {
+  turn: 'purple', phase: 'selectTile', tiles: new Map(), stacks: new Map(),
+  openingRound: 2, captures: { purple: 0, orange: 0 }, selectedTileId: null,
+  legalMoves: [], tileSpacing: 88, undoSnapshot: null, winner: null,
+  hoverTileId: null, hoverGhost: null, t: 0,
+};
+
+const canvas = document.createElement('canvas');
+canvas.width = 1200; canvas.height = 800;
+canvas.style.width = '100%'; canvas.style.height = '100%'; canvas.style.display = 'block';
+ui.viewport.appendChild(canvas);
+const ctx = canvas.getContext('2d');
+
+function resizeCanvas(){
+  const r = ui.viewport.getBoundingClientRect();
+  const w = Math.max(640, Math.floor(r.width));
+  const h = Math.max(420, Math.floor(r.height));
+  if (canvas.width !== w || canvas.height !== h){
+    canvas.width = w;
+    canvas.height = h;
+  }
 }
-function refresh(){state.legalMoves=legalMovesFor(state.turn);ui.scorePurple.textContent=state.captures.purple;ui.scoreOrange.textContent=state.captures.orange;const phase=state.phase==='selectTile'?'Move Phase':state.phase==='selectDest'?'Destination Phase':'Place Phase';ui.phaseBadge.textContent=phase;ui.turnInfo.textContent=`${state.turn[0].toUpperCase()+state.turn.slice(1)} Turn · ${phase}`;updateDebug();draw();if(state.winner){ui.winModal.classList.remove('hidden');ui.winTitle.textContent=`${state.winner.toUpperCase()} WINS`;}}
-function nearestTile(mx,my){let b=null,bd=1e9;for(const [tid,p] of state.tiles){const {sx,sy}=worldToScreen(p.x,p.y);const d=Math.hypot(mx-sx,my-sy);if(d<bd){bd=d;b={tid,pos:p};}}return bd<44?b:null;}
-function nearestGhost(mx,my){if(state.phase!=='selectDest'||!state.selectedTileId)return null;let b=null,bd=1e9;for(const m of state.legalMoves.filter(m=>m.tid===state.selectedTileId)){const {sx,sy}=worldToScreen(m.to.x,m.to.y);const d=Math.hypot(mx-sx,my-sy);if(d<bd){bd=d;b=m;}}return bd<44?b:null;}
-function runAudit(){const issues=[];if(state.tiles.size!==8)issues.push(`Tile count ${state.tiles.size} != 8`);const coords=[...state.tiles.values()].map(p=>key(p.x,p.y));if(new Set(coords).size!==coords.length)issues.push('Duplicate tile coordinates found');for(const [k,s] of state.stacks){if(s.length>MAX_STACK)issues.push(`${k} over stack max (${s.length})`);if(s.some(v=>!v))issues.push(`${k} has gap/empty slot`);}for(const p of state.tiles.values())if(!orthAdjacentToAnyTile(p.x,p.y))issues.push(`Isolated tile at (${p.x},${p.y})`);return issues;}
-function updateDebug(){const infl=[...influencedTiles(state.turn)].join(', ');const legal=state.legalMoves.filter(m=>m.tid===state.selectedTileId).map(m=>`(${m.to.x},${m.to.y})`).join(' ');let out='Tiles:\n';for(const [tid,p] of state.tiles){out+=`${tid}: (${p.x},${p.y}) stack=[${(state.stacks.get(key(p.x,p.y))||[]).join(',')}]\n`;}out+=`\nSelected: ${state.selectedTileId||'-'}\nLegal dests: ${legal||'-'}\nInfluence (${state.turn}): ${infl||'-'}`;ui.debugOutput.textContent=out;}
-canvas.addEventListener('mousemove',e=>{const r=canvas.getBoundingClientRect();const mx=(e.clientX-r.left)*(canvas.width/r.width);const my=(e.clientY-r.top)*(canvas.height/r.height);state.hoverTile=nearestTile(mx,my)?.tid||null;});
-canvas.addEventListener('click',e=>{if(state.winner)return;const r=canvas.getBoundingClientRect();const mx=(e.clientX-r.left)*(canvas.width/r.width);const my=(e.clientY-r.top)*(canvas.height/r.height);
-if(state.phase==='selectTile'){const t=nearestTile(mx,my);if(!t){setFeedback('Pick a highlighted tile you influence.');return;}if(state.selectedTileId===t.tid){state.selectedTileId=null;setFeedback('Selection canceled.');refresh();return;}if(!state.legalMoves.some(m=>m.tid===t.tid)){setFeedback('Illegal: this tile is not movable now.');return;}state.selectedTileId=t.tid;state.phase='selectDest';setFeedback('Choose a highlighted destination.');refresh();return;}
-if(state.phase==='selectDest'){const clickedTile=nearestTile(mx,my);if(clickedTile&&clickedTile.tid===state.selectedTileId){state.selectedTileId=null;state.phase='selectTile';setFeedback('Selection canceled.');refresh();return;}const m=nearestGhost(mx,my);if(!m){setFeedback('Illegal: choose a legal ghost destination.');return;}state.undoSnapshot=snapshot();const p=state.tiles.get(m.tid),from=key(p.x,p.y),to=key(m.to.x,m.to.y);state.stacks.set(to,state.stacks.get(from));state.stacks.delete(from);p.x=m.to.x;p.y=m.to.y;state.phase='place';state.selectedTileId=m.tid;log(`${state.turn} moved tile to (${p.x},${p.y})`);setFeedback('Now place one bloom on any non-full tile.');refresh();return;}
-if(state.phase==='place'){const t=nearestTile(mx,my);if(!t){setFeedback('Illegal: click a tile to place bloom.');return;}const s=state.stacks.get(key(t.pos.x,t.pos.y));if(s.length>=MAX_STACK){setFeedback('Illegal: stack already full (7).');return;}s.push(state.turn);log(`${state.turn} placed on (${t.pos.x},${t.pos.y})`);resolveCaptures(state.turn);if(state.captures[state.turn]>=WIN_CAPTURES){state.winner=state.turn;log(`${state.turn} wins by capture goal!`,'log-win');refresh();return;}state.turn=other(state.turn);state.phase='selectTile';state.selectedTileId=null;setFeedback('Turn complete. Move phase.');refresh();}}
-);
-window.addEventListener('keydown',e=>{if(e.key==='Escape'&&state.phase==='selectDest'){state.phase='selectTile';state.selectedTileId=null;setFeedback('Selection canceled (Esc).');refresh();}});
-ui.undoBtn.addEventListener('click',()=>{if(!state.undoSnapshot){setFeedback('Nothing to undo yet.');return;}restore(state.undoSnapshot);state.undoSnapshot=null;setFeedback('Undid previous full turn.');log('Undo: previous turn restored.');});
-ui.showCoords.addEventListener('change',draw);ui.showLiberties.addEventListener('change',draw);
-ui.runAudit.addEventListener('click',()=>{const issues=runAudit();if(!issues.length){log('Rules audit: no problems found.');setFeedback('Rules audit passed.');}else{issues.forEach(i=>log(`Audit: ${i}`,'log-capture'));setFeedback(`Audit found ${issues.length} issue(s).`);}updateDebug();draw();});
-setInterval(draw,90);
-log('Thigmo loaded.'); init();
+
+const key=(x,y)=>`${x},${y}`; const cellKey=(x,y,z)=>`${x},${y},${z}`;
+const other=(p)=>p==='purple'?'orange':'purple';
+const neighbors8=(x,y)=>{const o=[];for(let dx=-1;dx<=1;dx++)for(let dy=-1;dy<=1;dy++)if(dx||dy)o.push([x+dx,y+dy]);return o;};
+const neighbors6=(x,y,z)=>[[x+1,y,z],[x-1,y,z],[x,y+1,z],[x,y-1,z],[x,y,z+1],[x,y,z-1]];
+function log(msg){ const div=document.createElement('div'); div.textContent=msg; ui.log.prepend(div); }
+
+function init(){ let id=0; for(let y=0;y<2;y++)for(let x=0;x<4;x++){ const tid=`t${id++}`; state.tiles.set(tid,{x,y}); state.stacks.set(key(x,y),[]);} resizeCanvas(); refresh(); requestAnimationFrame(tick); }
+function snapshot(){ return { ...state, captures:{...state.captures}, tiles:new Map([...state.tiles].map(([k,v])=>[k,{...v}])), stacks:new Map([...state.stacks].map(([k,v])=>[k,[...v]]))}; }
+function restore(s){ Object.assign(state,s); refresh(); }
+
+function influencedTiles(player){
+  if(state.openingRound>0) return new Set([...state.tiles.keys()]);
+  const set=new Set();
+  for(const [tid,pos] of state.tiles){
+    if(state.stacks.get(key(pos.x,pos.y)).includes(player)){ set.add(tid); continue; }
+    for(const [nx,ny] of neighbors8(pos.x,pos.y)) if(state.stacks.get(key(nx,ny))?.includes(player)) { set.add(tid); break; }
+  }
+  return set;
+}
+function legalMovesFor(player){
+  const moves=[], influenced=influencedTiles(player), occ=new Set([...state.tiles.values()].map(t=>key(t.x,t.y)));
+  for(const [tid,from] of state.tiles) if(influenced.has(tid)) for(const [nx,ny] of neighbors8(from.x,from.y)) if(!occ.has(key(nx,ny))) moves.push({tid,from:{...from},to:{x:nx,y:ny}});
+  return moves;
+}
+function hasTile(x,y){ for(const t of state.tiles.values()) if(t.x===x&&t.y===y) return true; return false; }
+function getOccupancy(){ const occ=new Map(); for(const [kxy,stack] of state.stacks){ const [x,y]=kxy.split(',').map(Number); stack.forEach((c,z)=>occ.set(cellKey(x,y,z),c)); } return occ; }
+function groupFrom(start,occ){ const color=occ.get(start),q=[start],seen=new Set([start]),out=[]; while(q.length){ const c=q.pop(); out.push(c); const [x,y,z]=c.split(',').map(Number); for(const [nx,ny,nz] of neighbors6(x,y,z)){ const nk=cellKey(nx,ny,nz); if(!seen.has(nk)&&occ.get(nk)===color){seen.add(nk); q.push(nk);} } } return out; }
+function liberties(group,occ){ const libs=new Set(); for(const c of group){ const [x,y,z]=c.split(',').map(Number); for(const [nx,ny,nz] of neighbors6(x,y,z)){ if(nz<0) continue; if((nx!==x||ny!==y)&&!hasTile(nx,ny)) continue; const nk=cellKey(nx,ny,nz); if(!occ.has(nk)) libs.add(nk);} } return libs; }
+function removeCells(cells){ const map=new Map(); for(const c of cells){ const [x,y,z]=c.split(',').map(Number),kxy=key(x,y); if(!map.has(kxy)) map.set(kxy,[]); map.get(kxy).push(z);} for(const [kxy,zs] of map){ const s=state.stacks.get(kxy)||[]; state.stacks.set(kxy,s.filter((_,i)=>!zs.includes(i))); } }
+function resolveCaptures(active){ let changed=true; while(changed){ changed=false; const occ=getOccupancy(),visited=new Set(),groups={purple:[],orange:[]}; for(const c of occ.keys()){ if(visited.has(c)) continue; const g=groupFrom(c,occ); g.forEach(v=>visited.add(v)); groups[occ.get(c)].push(g);} const remEnemy=[]; for(const g of groups[other(active)]) if(liberties(g,occ).size===0) remEnemy.push(...g); if(remEnemy.length){removeCells(remEnemy); state.captures[active]+=remEnemy.length; changed=true;} const occ2=getOccupancy(),visited2=new Set(),remOwn=[]; for(const c of occ2.keys()){ if(visited2.has(c)||occ2.get(c)!==active) continue; const g=groupFrom(c,occ2); g.forEach(v=>visited2.add(v)); if(liberties(g,occ2).size===0) remOwn.push(...g);} if(remOwn.length){removeCells(remOwn); changed=true;} }}
+
+function worldToScreen(x,y){ const cx=canvas.width*0.45, cy=canvas.height*0.5; return {sx:cx+x*state.tileSpacing, sy:cy+y*state.tileSpacing*0.85}; }
+function tileRect(pos){ const {sx,sy}=worldToScreen(pos.x,pos.y); return {sx,sy,w:74,h:64}; }
+
+function drawBackground(){
+  const g=ctx.createRadialGradient(canvas.width*0.35,canvas.height*0.3,60,canvas.width*0.5,canvas.height*0.5,900);
+  g.addColorStop(0,'#7ba761'); g.addColorStop(1,'#2d4a28'); ctx.fillStyle=g; ctx.fillRect(0,0,canvas.width,canvas.height);
+  for(let i=0;i<220;i++){ const x=(i*97)%canvas.width, y=(i*61)%canvas.height; const a=0.06+0.03*Math.sin(i+state.t*0.0005); ctx.fillStyle=`rgba(209,244,180,${a})`; ctx.beginPath(); ctx.arc(x,y,10+((i*7)%11),0,Math.PI*2); ctx.fill(); }
+}
+
+function drawTile(pos, active, hover){
+  const {sx,sy,w,h}=tileRect(pos);
+  ctx.fillStyle='rgba(0,0,0,.25)'; ctx.beginPath(); ctx.ellipse(sx+3,sy+20,w*0.58,h*0.28,0,0,Math.PI*2); ctx.fill();
+  ctx.fillStyle='#3c2a1d'; ctx.fillRect(sx-w/2,sy-h/2+8,w,h*0.24);
+  const soil=ctx.createLinearGradient(sx,sy-h/2,sx,sy+h/2); soil.addColorStop(0,'#6b4d35'); soil.addColorStop(1,'#3c2818');
+  ctx.fillStyle=soil; roundRect(sx-w/2,sy-h/2,w,h,12); ctx.fill();
+  ctx.strokeStyle='rgba(196,230,161,.35)'; ctx.lineWidth=2; roundRect(sx-w/2,sy-h/2,w,h,12); ctx.stroke();
+  for(let i=0;i<10;i++){ ctx.strokeStyle='rgba(95,63,40,.35)'; ctx.beginPath(); ctx.moveTo(sx-w/2+8+i*7,sy-h/2+6); ctx.lineTo(sx-w/2+4+i*7,sy+h/2-6); ctx.stroke(); }
+  if(active||hover){ const pulse=0.35+0.25*Math.sin(state.t*0.006); ctx.strokeStyle=active?`rgba(219,255,190,${pulse+0.35})`:`rgba(244,255,220,${pulse})`; ctx.lineWidth=4; roundRect(sx-w/2-2,sy-h/2-2,w+4,h+4,14); ctx.stroke(); }
+}
+
+function drawFlower(player,x,y,z,top){
+  const sway = Math.sin(state.t*0.003 + z + x*0.7 + y*0.3) * 2;
+  const stemH=15; const py=y-z*18;
+  if(z>0){ ctx.strokeStyle='rgba(80,110,65,.9)'; ctx.lineWidth=4; ctx.beginPath(); ctx.moveTo(x+sway*0.4,py+8); ctx.lineTo(x+sway*0.2,py+stemH+5); ctx.stroke(); }
+  const pal = player==='purple'
+    ? {petal:'#9270ff',core:'#d8cbff',leaf:'#527749',glow:'rgba(176,145,255,.35)'}
+    : {petal:'#ff9f42',core:'#ffe5b5',leaf:'#64863f',glow:'rgba(255,172,89,.28)'};
+  if(top){ ctx.fillStyle=pal.glow; ctx.beginPath(); ctx.arc(x,py-2,20,0,Math.PI*2); ctx.fill(); }
+  ctx.strokeStyle=pal.leaf; ctx.lineWidth=2; ctx.beginPath(); ctx.moveTo(x-2,py+6); ctx.quadraticCurveTo(x-12,py+4,x-8,py-4); ctx.stroke();
+  for(let p=0;p<6;p++){ const a=(Math.PI*2/6)*p + state.t*0.0002; const px=x+Math.cos(a)*8+sway, py2=py+Math.sin(a)*6; ctx.fillStyle=pal.petal; ctx.beginPath(); ctx.ellipse(px,py2,5.5,3.5,a,0,Math.PI*2); ctx.fill(); }
+  ctx.fillStyle=pal.core; ctx.beginPath(); ctx.arc(x+sway*0.6,py,3.6,0,Math.PI*2); ctx.fill();
+}
+
+function draw(){
+  ctx.clearRect(0,0,canvas.width,canvas.height); drawBackground();
+  const selectedMoves = state.selectedTileId ? state.legalMoves.filter(m=>m.tid===state.selectedTileId) : [];
+  if(state.phase==='selectDest') for(const m of selectedMoves){ const {sx,sy}=worldToScreen(m.to.x,m.to.y); const pulse=0.5+0.3*Math.sin(state.t*0.01 + sx); ctx.fillStyle=`rgba(223,245,192,${pulse})`; roundRect(sx-32,sy-28,64,56,14); ctx.fill(); }
+
+  for(const [tid,pos] of state.tiles){
+    drawTile(pos, state.phase==='selectTile'&&state.legalMoves.some(m=>m.tid===tid), state.hoverTileId===tid || state.selectedTileId===tid);
+    const stack=state.stacks.get(key(pos.x,pos.y))||[]; const {sx,sy}=worldToScreen(pos.x,pos.y);
+    stack.forEach((p,z)=>drawFlower(p,sx,sy-3,z,z===stack.length-1));
+    if(stack.length>=6){ ctx.fillStyle='rgba(255,255,255,.85)'; ctx.font='bold 14px Inter'; ctx.fillText(String(stack.length),sx+20,sy-stack.length*18); }
+  }
+  if(ui.libertyToggle.checked) drawLibertyAssist();
+}
+
+function drawLibertyAssist(){ const enemy=other(state.turn),occ=getOccupancy(),seen=new Set(),assists=new Set(); for(const c of occ.keys()){ if(seen.has(c)||occ.get(c)!==enemy) continue; const g=groupFrom(c,occ); g.forEach(v=>seen.add(v)); liberties(g,occ).forEach(l=>assists.add(l)); } for(const l of assists){ const [x,y,z]=l.split(',').map(Number); const {sx,sy}=worldToScreen(x,y); ctx.fillStyle='rgba(196,255,178,.78)'; ctx.beginPath(); ctx.arc(sx,sy-z*18,5.3,0,Math.PI*2); ctx.fill(); }}
+
+function roundRect(x,y,w,h,r){ ctx.beginPath(); ctx.moveTo(x+r,y); ctx.arcTo(x+w,y,x+w,y+h,r); ctx.arcTo(x+w,y+h,x,y+h,r); ctx.arcTo(x,y+h,x,y,r); ctx.arcTo(x,y,x+w,y,r); ctx.closePath(); }
+function refresh(){ state.legalMoves=legalMovesFor(state.turn); ui.scorePurple.textContent=state.captures.purple; ui.scoreOrange.textContent=state.captures.orange; const phaseText=state.winner?`${state.winner.toUpperCase()} WINS`:(state.phase==='selectTile'?'Move living soil tile':state.phase==='selectDest'?'Select growth destination':'Plant invasive bloom'); ui.turnInfo.textContent=`${state.turn[0].toUpperCase()+state.turn.slice(1)} Turn · ${phaseText}`; document.getElementById('app-shell').style.setProperty('--edge-glow', state.turn==='purple' ? '#a084ff66' : '#ffbf7366'); draw(); }
+function nearestTile(mx,my){ let best=null,bestD=1e9; for(const [tid,pos] of state.tiles){ const {sx,sy}=worldToScreen(pos.x,pos.y); const d=Math.hypot(mx-sx,my-sy); if(d<bestD){bestD=d;best={tid,pos};}} return bestD<52?best:null; }
+function nearestGhost(mx,my){ if(state.phase!=='selectDest'||!state.selectedTileId) return null; let best=null,bestD=1e9; for(const m of state.legalMoves.filter(m=>m.tid===state.selectedTileId)){ const {sx,sy}=worldToScreen(m.to.x,m.to.y); const d=Math.hypot(mx-sx,my-sy); if(d<bestD){bestD=d;best=m;}} return bestD<55?best:null; }
+
+canvas.addEventListener('mousemove',(e)=>{ const r=canvas.getBoundingClientRect(); const mx=(e.clientX-r.left)*(canvas.width/r.width), my=(e.clientY-r.top)*(canvas.height/r.height); state.hoverTileId=nearestTile(mx,my)?.tid||null; state.hoverGhost=nearestGhost(mx,my); draw(); });
+canvas.addEventListener('click',(e)=>{ if(state.winner) return; const rect=canvas.getBoundingClientRect(); const mx=(e.clientX-rect.left)*(canvas.width/rect.width), my=(e.clientY-rect.top)*(canvas.height/rect.height);
+  if(state.phase==='selectTile'){ const t=nearestTile(mx,my); if(!t||!state.legalMoves.some(m=>m.tid===t.tid)) return; state.selectedTileId=t.tid; state.phase='selectDest'; refresh(); return; }
+  if(state.phase==='selectDest'){ const m=nearestGhost(mx,my); if(!m) return; state.undoSnapshot=snapshot(); const p=state.tiles.get(m.tid), fromK=key(p.x,p.y), toK=key(m.to.x,m.to.y), stack=state.stacks.get(fromK); state.stacks.delete(fromK); state.stacks.set(toK,stack); p.x=m.to.x; p.y=m.to.y; state.phase='place'; log(`${state.turn} shifted living earth to (${p.x}, ${p.y})`); refresh(); return; }
+  if(state.phase==='place'){ const t=nearestTile(mx,my); if(!t) return; state.stacks.get(key(t.pos.x,t.pos.y)).push(state.turn); resolveCaptures(state.turn); if(state.captures[state.turn]>=WIN_CAPTURES){ state.winner=state.turn; refresh(); return; } state.turn=other(state.turn); if(state.openingRound>0) state.openingRound-=1; state.phase='selectTile'; state.selectedTileId=null; refresh(); }
+});
+
+ui.undoBtn.addEventListener('click',()=>{ if(state.undoSnapshot){ restore(state.undoSnapshot); log('Turn undone.'); }});
+ui.spacing.addEventListener('input',()=>{ state.tileSpacing=56+Number(ui.spacing.value)*10; draw(); });
+ui.libertyToggle.addEventListener('change',draw);
+function tick(ts){ state.t=ts; draw(); requestAnimationFrame(tick); }
+
+log('Thigmo botanical battlefield loaded.');
+init();
+
+window.addEventListener('resize', ()=>{ resizeCanvas(); draw(); });
