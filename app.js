@@ -23,13 +23,23 @@ canvas.style.width = '100%'; canvas.style.height = '100%'; canvas.style.display 
 ui.viewport.appendChild(canvas);
 const ctx = canvas.getContext('2d');
 
+function resizeCanvas(){
+  const r = ui.viewport.getBoundingClientRect();
+  const w = Math.max(640, Math.floor(r.width));
+  const h = Math.max(420, Math.floor(r.height));
+  if (canvas.width !== w || canvas.height !== h){
+    canvas.width = w;
+    canvas.height = h;
+  }
+}
+
 const key=(x,y)=>`${x},${y}`; const cellKey=(x,y,z)=>`${x},${y},${z}`;
 const other=(p)=>p==='purple'?'orange':'purple';
 const neighbors8=(x,y)=>{const o=[];for(let dx=-1;dx<=1;dx++)for(let dy=-1;dy<=1;dy++)if(dx||dy)o.push([x+dx,y+dy]);return o;};
 const neighbors6=(x,y,z)=>[[x+1,y,z],[x-1,y,z],[x,y+1,z],[x,y-1,z],[x,y,z+1],[x,y,z-1]];
 function log(msg){ const div=document.createElement('div'); div.textContent=msg; ui.log.prepend(div); }
 
-function init(){ let id=0; for(let y=0;y<2;y++)for(let x=0;x<4;x++){ const tid=`t${id++}`; state.tiles.set(tid,{x,y}); state.stacks.set(key(x,y),[]);} refresh(); requestAnimationFrame(tick); }
+function init(){ let id=0; for(let y=0;y<2;y++)for(let x=0;x<4;x++){ const tid=`t${id++}`; state.tiles.set(tid,{x,y}); state.stacks.set(key(x,y),[]);} resizeCanvas(); refresh(); requestAnimationFrame(tick); }
 function snapshot(){ return { ...state, captures:{...state.captures}, tiles:new Map([...state.tiles].map(([k,v])=>[k,{...v}])), stacks:new Map([...state.stacks].map(([k,v])=>[k,[...v]]))}; }
 function restore(s){ Object.assign(state,s); refresh(); }
 
@@ -59,7 +69,7 @@ function tileRect(pos){ const {sx,sy}=worldToScreen(pos.x,pos.y); return {sx,sy,
 
 function drawBackground(){
   const g=ctx.createRadialGradient(canvas.width*0.35,canvas.height*0.3,60,canvas.width*0.5,canvas.height*0.5,900);
-  g.addColorStop(0,'#6f9a57'); g.addColorStop(1,'#36552f'); ctx.fillStyle=g; ctx.fillRect(0,0,canvas.width,canvas.height);
+  g.addColorStop(0,'#7ba761'); g.addColorStop(1,'#2d4a28'); ctx.fillStyle=g; ctx.fillRect(0,0,canvas.width,canvas.height);
   for(let i=0;i<220;i++){ const x=(i*97)%canvas.width, y=(i*61)%canvas.height; const a=0.06+0.03*Math.sin(i+state.t*0.0005); ctx.fillStyle=`rgba(209,244,180,${a})`; ctx.beginPath(); ctx.arc(x,y,10+((i*7)%11),0,Math.PI*2); ctx.fill(); }
 }
 
@@ -98,7 +108,7 @@ function draw(){
     stack.forEach((p,z)=>drawFlower(p,sx,sy-3,z,z===stack.length-1));
     if(stack.length>=6){ ctx.fillStyle='rgba(255,255,255,.85)'; ctx.font='bold 14px Inter'; ctx.fillText(String(stack.length),sx+20,sy-stack.length*18); }
   }
-  if(ui.libertyToggle.checked) drawLibertyAssist();
+  if(!ui.libertyToggle || ui.libertyToggle.checked) drawLibertyAssist();
 }
 
 function drawLibertyAssist(){ const enemy=other(state.turn),occ=getOccupancy(),seen=new Set(),assists=new Set(); for(const c of occ.keys()){ if(seen.has(c)||occ.get(c)!==enemy) continue; const g=groupFrom(c,occ); g.forEach(v=>seen.add(v)); liberties(g,occ).forEach(l=>assists.add(l)); } for(const l of assists){ const [x,y,z]=l.split(',').map(Number); const {sx,sy}=worldToScreen(x,y); ctx.fillStyle='rgba(196,255,178,.78)'; ctx.beginPath(); ctx.arc(sx,sy-z*18,5.3,0,Math.PI*2); ctx.fill(); }}
@@ -115,10 +125,12 @@ canvas.addEventListener('click',(e)=>{ if(state.winner) return; const rect=canva
   if(state.phase==='place'){ const t=nearestTile(mx,my); if(!t) return; state.stacks.get(key(t.pos.x,t.pos.y)).push(state.turn); resolveCaptures(state.turn); if(state.captures[state.turn]>=WIN_CAPTURES){ state.winner=state.turn; refresh(); return; } state.turn=other(state.turn); if(state.openingRound>0) state.openingRound-=1; state.phase='selectTile'; state.selectedTileId=null; refresh(); }
 });
 
-ui.undoBtn.addEventListener('click',()=>{ if(state.undoSnapshot){ restore(state.undoSnapshot); log('Turn undone.'); }});
-ui.spacing.addEventListener('input',()=>{ state.tileSpacing=56+Number(ui.spacing.value)*10; draw(); });
-ui.libertyToggle.addEventListener('change',draw);
+if (ui.undoBtn) ui.undoBtn.addEventListener('click',()=>{ if(state.undoSnapshot){ restore(state.undoSnapshot); log('Turn undone.'); }});
+if (ui.spacing) ui.spacing.addEventListener('input',()=>{ state.tileSpacing=56+Number(ui.spacing.value)*10; draw(); });
+if (ui.libertyToggle) ui.libertyToggle.addEventListener('change',draw);
 function tick(ts){ state.t=ts; draw(); requestAnimationFrame(tick); }
 
 log('Thigmo botanical battlefield loaded.');
 init();
+
+window.addEventListener('resize', ()=>{ resizeCanvas(); draw(); });
