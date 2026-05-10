@@ -16,6 +16,7 @@
       </div>
       <div class="turn-info" id="turn-info">Purple Turn · Move a tile</div>
       <div class="controls-inline">
+        <a class="rules-link" href="docs/THIGMO_DESIGN_SPEC_V1.md" target="_blank" rel="noopener noreferrer">refer to rules</a>
         <button id="undo-btn">Undo Turn</button>
       </div>
     </header>
@@ -58,14 +59,7 @@
     </aside>
   </div>
 
-  <div id="win-modal" class="win-modal hidden">
-    <div class="win-content">
-      <h2 id="win-title">Winner</h2>
-      <p>Reached 10 captures.</p>
-    </div>
-  </div>
-
-  <script src="app.js?v=20260510-polish-audit" defer></script>
+  <script src="app.js?v=20260510-botanical-fix1" defer></script>
   <script>
     window.addEventListener('DOMContentLoaded', ()=>{
       const el=document.getElementById('build-id');
