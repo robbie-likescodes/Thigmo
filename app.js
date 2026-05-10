@@ -2,7 +2,7 @@ import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.166.1/build/three.m
 import { OrbitControls } from 'https://cdn.jsdelivr.net/npm/three@0.166.1/examples/jsm/controls/OrbitControls.js';
 
 const COLORS = { purple: 0x7a3cff, orange: 0xff9f1c, greenAssist: 0x4bd96b };
-const TILE_SIZE = 1;
+const TILE_SIZE = 1.25;
 const LEVEL_H = 0.62;
 const WIN_CAPTURES = 10;
 
@@ -39,18 +39,17 @@ const state = {
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0xb9e9a8);
 const camera = new THREE.PerspectiveCamera(55, 1, 0.1, 200);
-camera.position.set(7, 8, 9);
+camera.position.set(6.5, 6.5, 6.5);
 const renderer = new THREE.WebGLRenderer({ antialias: true });
 ui.viewport.appendChild(renderer.domElement);
 
 const controls = new OrbitControls(camera, renderer.domElement);
-controls.target.set(2.25, 0, 0.75);
-camera.lookAt(controls.target);
-controls.update();
 controls.enableDamping = true;
 controls.mouseButtons.LEFT = THREE.MOUSE.ROTATE;
 controls.mouseButtons.MIDDLE = THREE.MOUSE.PAN;
 controls.enablePan = true;
+controls.target.set(2.25, 0.4, 0.8);
+controls.update();
 
 renderer.domElement.addEventListener('pointerdown', (e) => {
   if (e.shiftKey) controls.mouseButtons.LEFT = THREE.MOUSE.PAN;
@@ -82,6 +81,20 @@ const meshRefs = { tiles: new Map(), flowers: new Map(), ghosts: [] , assists: [
 function key(x, y) { return `${x},${y}`; }
 function cellKey(x,y,z){ return `${x},${y},${z}`; }
 function other(player){ return player === 'purple' ? 'orange' : 'purple'; }
+function getBoardCenter() {
+  const positions = [...state.tiles.values()];
+  const cx = positions.reduce((a, p) => a + p.x, 0) / positions.length;
+  const cy = positions.reduce((a, p) => a + p.y, 0) / positions.length;
+  return { x: cx * state.tileSpacing, z: cy * state.tileSpacing };
+}
+function frameBoard(resetCamera = false) {
+  const c = getBoardCenter();
+  controls.target.set(c.x, 0.35, c.z);
+  if (resetCamera) {
+    camera.position.set(c.x + 6, 6.8, c.z + 6);
+  }
+  controls.update();
+}
 
 function log(msg) {
   const p = document.createElement('div');
@@ -327,7 +340,7 @@ function rerenderBoard(){
   meshRefs.tiles.clear(); meshRefs.flowers.clear(); meshRefs.ghosts=[]; meshRefs.assists=[];
 
   for(const [tid,pos] of state.tiles.entries()){
-    const patch = new THREE.Mesh(new THREE.BoxGeometry(TILE_SIZE,.15,TILE_SIZE), new THREE.MeshStandardMaterial({color:0x7b4f2d, roughness:.9}));
+    const patch = new THREE.Mesh(new THREE.BoxGeometry(TILE_SIZE,.2,TILE_SIZE), new THREE.MeshStandardMaterial({color:0x6f3d1f, roughness:.82}));
     patch.position.set(pos.x*state.tileSpacing, .08, pos.y*state.tileSpacing);
     patch.userData={type:'tile',tid};
     world.add(patch); meshRefs.tiles.set(tid, patch);
@@ -364,6 +377,7 @@ function rerenderBoard(){
       world.add(ring); meshRefs.assists.push(ring);
     });
   }
+  frameBoard(false);
 }
 
 function computeAssistCells(){
@@ -460,6 +474,7 @@ function resize(){
 window.addEventListener('resize', resize);
 
 initBoard();
+frameBoard(true);
 refreshPhase();
 resize();
 log('Welcome to Thigmo v1 prototype.');
