@@ -35,6 +35,8 @@ const state = {
   wiltingEffects: [],
   camera: { yaw: -0.55, pitch: 0.72, zoom: 1.15, userAdjusted: false },
   drag: { active: false, moved: false, startX: 0, startY: 0, startYaw: 0, startPitch: 0 },
+  hoverTileId: null,
+  hoverPlaceTileId: null,
 };
 
 const canvas = document.createElement('canvas');
@@ -562,6 +564,15 @@ function draw(){
   for(const {pos} of orderedTiles){
     const stack=state.stacks.get(key(pos.x,pos.y))||[]; const {sx,sy}=worldToScreen(pos.x,pos.y);
     stack.forEach((p,z)=>drawFlower(p,pos.x,pos.y,z,z===stack.length-1));
+    if (state.phase === 'place' && state.hoverPlaceTileId) {
+      const hoverPos = state.tiles.get(state.hoverPlaceTileId);
+      if (hoverPos && hoverPos.x === pos.x && hoverPos.y === pos.y) {
+        ctx.save();
+        ctx.globalAlpha = 0.45;
+        drawFlower(state.turn, pos.x, pos.y, stack.length, true);
+        ctx.restore();
+      }
+    }
     if(stack.length>=6){ ctx.fillStyle='rgba(255,255,255,.85)'; ctx.font='bold 14px Inter'; ctx.fillText(String(stack.length),sx+20,sy-stack.length*FLOWER_VERTICAL_SPACING); }
   }
 
@@ -682,6 +693,21 @@ window.addEventListener('mousemove', (e)=>{
   draw();
 });
 
+canvas.addEventListener('mousemove', (e)=>{
+  if (state.drag.active) return;
+  const rect=canvas.getBoundingClientRect();
+  const mx=(e.clientX-rect.left)*(canvas.width/rect.width);
+  const my=(e.clientY-rect.top)*(canvas.height/rect.height);
+  const tile = nearestTile(mx,my);
+  const nextHoverTileId = (state.phase === 'selectTile' || state.phase === 'place') ? (tile ? tile.tid : null) : null;
+  const nextHoverPlaceTileId = state.phase === 'place' ? (tile ? tile.tid : null) : null;
+  if (nextHoverTileId !== state.hoverTileId || nextHoverPlaceTileId !== state.hoverPlaceTileId) {
+    state.hoverTileId = nextHoverTileId;
+    state.hoverPlaceTileId = nextHoverPlaceTileId;
+    draw();
+  }
+});
+
 window.addEventListener('mouseup', ()=>{
   state.drag.active = false;
 });
@@ -702,7 +728,7 @@ canvas.addEventListener('click', (e)=>{
   if(state.phase==='selectTile'){
     const t=nearestTile(mx,my); if(!t) return;
     if(!state.legalMoves.some(m=>m.tid===t.tid)) return;
-    state.selectedTileId=t.tid; state.phase='selectDest'; ensureCoordinateVisible(t.pos.x, t.pos.y); refresh(); return;
+    state.selectedTileId=t.tid; state.phase='selectDest'; state.hoverPlaceTileId=null; ensureCoordinateVisible(t.pos.x, t.pos.y); refresh(); return;
   }
   if(state.phase==='selectDest'){
     const m=nearestGhost(mx,my); if(!m) return;
@@ -713,7 +739,7 @@ canvas.addEventListener('click', (e)=>{
     state.undoSnapshot = snapshot();
     const p=state.tiles.get(m.tid); const fromK=key(p.x,p.y), toK=key(m.to.x,m.to.y); const stack=state.stacks.get(fromK);
     state.stacks.delete(fromK); state.stacks.set(toK,stack); p.x=m.to.x; p.y=m.to.y;
-    state.phase='place'; ensureCoordinateVisible(p.x, p.y); log(`${state.turn} moved tile to (${p.x}, ${p.y})`); refresh(); return;
+    state.phase='place'; state.hoverPlaceTileId=null; ensureCoordinateVisible(p.x, p.y); log(`${state.turn} moved tile to (${p.x}, ${p.y})`); refresh(); return;
   }
   if(state.phase==='place'){
     const t=nearestTile(mx,my); if(!t) return;
@@ -722,7 +748,7 @@ canvas.addEventListener('click', (e)=>{
     if(state.captures[state.turn] >= WIN_CAPTURES){ state.winner=state.turn; showWinModal(state.turn); refresh(); return; }
     state.turn = other(state.turn);
     if(state.openingRound>0) state.openingRound -= 1;
-    state.phase='selectTile'; state.selectedTileId=null; refresh();
+    state.phase='selectTile'; state.selectedTileId=null; state.hoverPlaceTileId=null; refresh();
   }
 });
 
