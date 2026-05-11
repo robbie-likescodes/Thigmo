@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Thigmo Rules</title>
+  <style>
+    :root {
+      --bg: #d9e7c9;
+      --panel: #f6f2e8;
+      --ink: #233221;
+      --purple: #8f72ff;
+      --orange: #ff9f42;
+      --border: #b9caa7;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: "Segoe UI", "Avenir Next", Inter, system-ui, sans-serif;
+      color: var(--ink);
+      background: radial-gradient(circle at 10% 0%, #eff8dd, #c8dbb2 60%, #9db588);
+      display: grid;
+      place-items: center;
+      padding: 24px;
+    }
+    .rules-shell {
+      width: min(980px, 100%);
+      background: linear-gradient(180deg, #fffdf8, #f1ecdf);
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      box-shadow: 0 16px 44px rgba(35, 50, 33, 0.22);
+      padding: clamp(20px, 4vw, 42px);
+      text-align: center;
+      line-height: 1.65;
+    }
+    h1, h2, h3 { line-height: 1.25; margin-top: 1.4em; }
+    h1 { margin-top: 0; color: #334b2d; }
+    h2 {
+      border-top: 1px solid #d8cfb7;
+      padding-top: 18px;
+      color: #3b5532;
+    }
+    h3 { color: #4f3a8c; }
+    p, li { max-width: 70ch; margin-left: auto; margin-right: auto; }
+    ul, ol { padding-left: 0; list-style-position: inside; }
+    .factions { display: inline-flex; gap: 12px; font-weight: 700; margin: 4px 0 12px; }
+    .purple { color: var(--purple); }
+    .orange { color: var(--orange); }
+    .back-link {
+      display: inline-block;
+      margin-top: 20px;
+      border: 1px solid #8ba780;
+      background: #fff;
+      border-radius: 8px;
+      padding: 8px 12px;
+      color: inherit;
+      text-decoration: none;
+      font-weight: 600;
+    }
+    .back-link:hover { background: #f4fff0; }
+  </style>
+</head>
+<body>
+  <main class="rules-shell">
+    <h1>🌸 Thigmo Rules — <em>Botanical Battlefield</em></h1>
+    <p>Welcome to <strong>Thigmo</strong>, where rival floral lineages wage a slow, intelligent war for dominance of living soil. Every stem, tendril, and rootlet competes for one destiny: become the reigning invasive species.</p>
+    <p>This isn’t random growth. This is <strong>botanical strategy</strong>.</p>
+
+    <h2>1) Objective: Rule the Soil</h2>
+    <p>Your goal is to overrun your rival’s bloom network through positional pressure and oxygen starvation.</p>
+    <ul>
+      <li>You win immediately when you have captured <strong>10 enemy blooms</strong>.</li>
+      <li>Captures happen through tactical encirclement and deprivation of growth space (liberties).</li>
+    </ul>
+
+    <h2>2) Components of the Living Battlefield</h2>
+    <p><strong>8 terrain tiles</strong> (movable soil patches) make the board.</p>
+    <p>Two bloom factions:</p>
+    <div class="factions"><span class="purple">Purple</span><span class="orange">Orange</span></div>
+    <p>A vertical growth column rises on each tile (stacks of blooms upward).</p>
+
+    <h2>3) Board Ecology: How Space Exists in Thigmo</h2>
+    <ol>
+      <li>The world is an infinite coordinate field.</li>
+      <li>Only <strong>8 soil tiles</strong> exist in the match.</li>
+      <li>No two tiles may occupy the same coordinate.</li>
+      <li>Blooms occupy vertical positions above each tile: <code>z = 0, 1, 2...</code></li>
+      <li>If a tile moves, the <strong>entire bloom stack on that tile moves with it</strong>.</li>
+    </ol>
+
+    <h2>4) Turn Cycle: Pulse of Growth</h2>
+    <h3>Phase A — Shift One Soil Tile (Required)</h3>
+    <ul>
+      <li>Move exactly one influenced tile by one step (orthogonal or diagonal).</li>
+      <li>Destination must be empty.</li>
+      <li>All 8 tiles must remain orthogonally connected after moving.</li>
+    </ul>
+
+    <h3>Phase B — Plant One Bloom (Required unless full)</h3>
+    <ul>
+      <li>Place one bloom of your color onto any tile.</li>
+      <li>It lands on the top of that stack.</li>
+      <li>You cannot place if the stack is already at the 7-bloom max.</li>
+    </ul>
+
+    <h3>Phase C — Resolve Withering (Captures)</h3>
+    <ul>
+      <li>Opponent zero-liberty groups are removed first.</li>
+      <li>Then your own zero-liberty groups are removed.</li>
+      <li>Repeat until no new removals occur.</li>
+    </ul>
+
+    <h2>5) Tile Influence</h2>
+    <p>A soil tile is movable if your bloom is on that tile <strong>or</strong> on any neighboring tile (8-direction neighborhood).</p>
+
+    <h2>6) Groups and Liberties</h2>
+    <p>Groups connect by orthogonal 3D adjacency only. A <strong>liberty</strong> is an empty orthogonally adjacent cell where growth could exist.</p>
+
+    <h2>7) Win Condition</h2>
+    <p>You win instantly when your captured enemy blooms reaches <strong>10</strong> after resolution.</p>
+
+    <a class="back-link" href="../index.html">← Back to game</a>
+  </main>
+</body>
+</html>
