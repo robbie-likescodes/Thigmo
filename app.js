@@ -244,7 +244,7 @@ function worldToScreen(x, y, height = 0){
   const rotY = localX * yawSin + localY * yawCos;
 
   const floorTilt = Math.max(0.58, Math.cos(pitch));
-  const heightLift = Math.max(0.45, Math.cos(pitch * 0.72));
+  const heightLift = Math.max(0.62, Math.cos(pitch * 0.72));
 
   return {
     sx: canvas.width * 0.5 + rotX * zoom,
@@ -252,16 +252,6 @@ function worldToScreen(x, y, height = 0){
     depth: rotY,
     scale: zoom,
   };
-}
-
-function tileCorners(x, y){
-  const half = 0.5;
-  return [
-    worldToScreen(x - half, y - half),
-    worldToScreen(x + half, y - half),
-    worldToScreen(x + half, y + half),
-    worldToScreen(x - half, y + half),
-  ];
 }
 
 function tileCorners(x, y){
@@ -455,6 +445,23 @@ function fitCameraToBoard(){
   state.camera.zoom = Math.max(0.9, Math.min(2.6, Math.min(targetW / boardW, targetH / boardH)));
 }
 
+
+function tilesByDepth(){
+  return [...state.tiles.entries()]
+    .map(([tid, pos])=>({ tid, pos, depth: worldToScreen(pos.x, pos.y).depth }))
+    .sort((a,b)=>a.depth-b.depth);
+}
+
+function drawProjectedSquare(x, y, color){
+  const corners = tileCorners(x, y);
+  ctx.fillStyle = color;
+  ctx.beginPath();
+  ctx.moveTo(corners[0].sx, corners[0].sy);
+  for (let i=1;i<corners.length;i++) ctx.lineTo(corners[i].sx, corners[i].sy);
+  ctx.closePath();
+  ctx.fill();
+}
+
 function draw(){
   pruneWiltingEffects();
   ctx.clearRect(0,0,canvas.width,canvas.height);
@@ -492,21 +499,17 @@ function draw(){
   }
   const highlight = activeTurnHighlight();
 
+  const orderedTiles = tilesByDepth();
   const selectedMoves = state.selectedTileId ? state.legalMoves.filter(m=>m.tid===state.selectedTileId) : [];
   if (state.phase === 'selectDest') {
-    for(const m of selectedMoves){
-      const {sx,sy}=worldToScreen(m.to.x,m.to.y);
-      ctx.fillStyle = highlight.ghost;
-      ctx.fillRect(sx-30,sy-30,60,60);
-    }
+    for (const m of selectedMoves) drawProjectedSquare(m.to.x, m.to.y, highlight.ghost);
   }
 
-  for(const [tid,pos] of state.tiles){
-    const isSelected = state.selectedTileId===tid || (state.phase==='selectTile' && state.hoverTileId===tid);
-    drawTile(pos, state.phase==='selectTile'&&state.legalMoves.some(m=>m.tid===tid), isSelected, highlight.solid);
+  for(const {tid,pos} of orderedTiles){
+    drawTile(pos, state.phase==='selectTile'&&state.legalMoves.some(m=>m.tid===tid), state.hoverTileId===tid || state.selectedTileId===tid);
   }
   drawVineConnections();
-  for(const [tid,pos] of state.tiles){
+  for(const {pos} of orderedTiles){
     const stack=state.stacks.get(key(pos.x,pos.y))||[]; const {sx,sy}=worldToScreen(pos.x,pos.y);
     stack.forEach((p,z)=>drawFlower(p,pos.x,pos.y,z,z===stack.length-1));
     if(stack.length>=6){ ctx.fillStyle='rgba(255,255,255,.85)'; ctx.font='bold 14px Inter'; ctx.fillText(String(stack.length),sx+20,sy-stack.length*18); }
