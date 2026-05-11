@@ -592,17 +592,19 @@ function draw(){
     ctx.stroke();
   }
 
-  for (let i = 0; i < 340; i++) {
+  for (let i = 0; i < 2000; i++) {
     const x = (i * 73) % canvas.width;
     const y = ((i * 97) % canvas.height) + 8;
     if (y < horizonY) continue;
-    const h = 3 + (i % 5);
-    const bend = ((i % 4) - 1.5) * 0.8 + Math.sin(t * 1.2 + i * 0.14) * 1.6;
-    ctx.strokeStyle = i % 3 === 0 ? 'rgba(76, 140, 62, 0.28)' : 'rgba(104, 170, 85, 0.22)';
-    ctx.lineWidth = 1;
+    const depth = Math.min(1, (y - horizonY) / Math.max(1, canvas.height - horizonY));
+    const h = 8 + depth * 28 + (i % 9) * 1.8;
+    const bend = (((i % 6) - 2.5) * 1.2 + Math.sin(t * 1.2 + i * 0.14) * 2.4) * (0.7 + depth * 0.9);
+    const alpha = 0.24 + depth * 0.32;
+    ctx.strokeStyle = i % 3 === 0 ? `rgba(66, 128, 51, ${alpha})` : `rgba(96, 168, 74, ${alpha - 0.06})`;
+    ctx.lineWidth = 1 + depth * 2.2;
     ctx.beginPath();
     ctx.moveTo(x, y);
-    ctx.quadraticCurveTo(x + bend, y - h * 0.5, x + bend * 1.2, y - h);
+    ctx.quadraticCurveTo(x + bend, y - h * 0.46, x + bend * 1.35, y - h);
     ctx.stroke();
   }
   const highlight = activeTurnHighlight();
