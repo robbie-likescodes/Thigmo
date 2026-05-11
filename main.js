@@ -202,6 +202,24 @@ function queueWiltAnimations(cells, occ){
   }
 }
 
+
+function drawForegroundGrass(){
+  const baseY = canvas.height;
+  ctx.save();
+  for (let x = -10; x <= canvas.width + 14; x += 14){
+    const bladeHeight = 14 + ((x * 17) % 11);
+    const sway = Math.sin((x + performance.now() * 0.02) * 0.02) * 2;
+    ctx.beginPath();
+    ctx.moveTo(x, baseY);
+    ctx.quadraticCurveTo(x + sway, baseY - bladeHeight * 0.55, x + sway * 0.8, baseY - bladeHeight);
+    ctx.quadraticCurveTo(x + 2 + sway, baseY - bladeHeight * 0.55, x + 4, baseY);
+    ctx.closePath();
+    ctx.fillStyle = '#6bb652';
+    ctx.fill();
+  }
+  ctx.restore();
+}
+
 function worldToScreen(x,y){
   const centerX = canvas.width*0.45;
   const centerY = canvas.height*0.5;
@@ -242,6 +260,7 @@ function draw(){
   }
 
   drawCaptureAnimations();
+  drawForegroundGrass();
 
   if (ui.libertyToggle.checked) drawLibertyAssist();
 }
