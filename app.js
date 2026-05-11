@@ -44,8 +44,8 @@ const state = {
   captureAnimations: [],
   fallingAnimations: [],
 };
-const POP_DURATION_MS = 650;
-const FALL_DURATION_MS = 540;
+const POP_DURATION_MS = 850;
+const FALL_DURATION_MS = 700;
 
 const canvas = document.createElement('canvas');
 canvas.width = 1200;
@@ -222,6 +222,22 @@ function removeCells(cells){
   for(const [kxy,zs] of map){ const s=state.stacks.get(kxy)||[]; state.stacks.set(kxy,s.filter((_,i)=>!zs.includes(i))); }
 }
 function sleep(ms){ return new Promise((resolve)=>setTimeout(resolve, ms)); }
+
+function waitForActiveAnimations(type){
+  return new Promise((resolve)=>{
+    const check = ()=>{
+      const now = performance.now();
+      const animations = type === 'pop' ? state.captureAnimations : state.fallingAnimations;
+      const active = animations.some((anim)=> now - anim.start < anim.duration);
+      if (!active) {
+        resolve();
+        return;
+      }
+      requestAnimationFrame(check);
+    };
+    check();
+  });
+}
 function detectCaptureSet(active){
   const occ = getOccupancy();
   const visited = new Set();
@@ -265,7 +281,7 @@ async function resolveCaptures(active){
       return { id:c, x,y,z, color: occ.get(c), captured:true, popping:true, removeAfterAnimation:true, start: performance.now(), duration: POP_DURATION_MS };
     });
     console.log('pop animation started');
-    await sleep(POP_DURATION_MS);
+    await waitForActiveAnimations('pop');
     console.log('pop animation finished');
     state.captureAnimations = [];
     const falling = buildFallingAnimations(toRemove).map((f)=>({ ...f, start: performance.now(), duration: FALL_DURATION_MS }));
@@ -273,7 +289,7 @@ async function resolveCaptures(active){
     addWiltingEffects(toRemove, occ);
     removeCells(toRemove);
     console.log('fall animation started');
-    await sleep(FALL_DURATION_MS);
+    await waitForActiveAnimations('fall');
     state.fallingAnimations = [];
     console.log('fall animation finished');
     if (remEnemy.length){
@@ -974,7 +990,7 @@ if (ui.mobileFlowerIcon) {
     draw();
   };
   ui.mobileFlowerIcon.addEventListener('pointerdown', (e)=>{
-    if (!isMobileViewport() || state.phase !== 'place' || state.winner) return;
+    if (!isMobileViewport() || state.phase !== 'place' || state.winner || state.isAnimating) return;
     e.preventDefault();
     ui.mobileFlowerIcon.setPointerCapture(e.pointerId);
     state.mobilePlaceDrag.active = true;
