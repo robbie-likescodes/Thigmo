@@ -519,15 +519,33 @@ function draw(){
   ctx.clearRect(0,0,canvas.width,canvas.height);
   const t = (state.t || performance.now()) * 0.001;
 
-  // Layered grassy backdrop with subtle texture.
-  const bgGradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
-  bgGradient.addColorStop(0, '#bfe9aa');
-  bgGradient.addColorStop(0.55, '#9fd58c');
-  bgGradient.addColorStop(1, '#84bf74');
-  ctx.fillStyle = bgGradient;
-  ctx.fillRect(0,0,canvas.width,canvas.height);
+  const horizonY = canvas.height * (0.34 + (1 - state.camera.pitch) * 0.18);
+
+  // Sky gradient above the horizon so camera movement always reveals blue sky.
+  const skyGradient = ctx.createLinearGradient(0, 0, 0, horizonY);
+  skyGradient.addColorStop(0, '#9ad6ff');
+  skyGradient.addColorStop(0.68, '#bde9ff');
+  skyGradient.addColorStop(1, '#d6f3ff');
+  ctx.fillStyle = skyGradient;
+  ctx.fillRect(0, 0, canvas.width, Math.max(1, horizonY));
+
+  // Ground gradient starts at the horizon line and deepens toward foreground.
+  const groundGradient = ctx.createLinearGradient(0, horizonY, 0, canvas.height);
+  groundGradient.addColorStop(0, '#a7da90');
+  groundGradient.addColorStop(0.5, '#93ce7e');
+  groundGradient.addColorStop(1, '#84bf74');
+  ctx.fillStyle = groundGradient;
+  ctx.fillRect(0, horizonY, canvas.width, canvas.height - horizonY);
+
+  ctx.strokeStyle = 'rgba(116, 181, 124, 0.75)';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(0, horizonY + 0.5);
+  ctx.quadraticCurveTo(canvas.width * 0.5, horizonY - 16, canvas.width, horizonY + 0.5);
+  ctx.stroke();
 
   for (let y = 0; y < canvas.height; y += 3) {
+    if (y < horizonY) continue;
     const wave = Math.sin(t * 0.55 + y * 0.03) * 18;
     ctx.strokeStyle = `rgba(162, 214, 138, ${0.06 + ((y / canvas.height) * 0.05)})`;
     ctx.lineWidth = 1;
@@ -540,6 +558,7 @@ function draw(){
   for (let i = 0; i < 340; i++) {
     const x = (i * 73) % canvas.width;
     const y = ((i * 97) % canvas.height) + 8;
+    if (y < horizonY) continue;
     const h = 3 + (i % 5);
     const bend = ((i % 4) - 1.5) * 0.8 + Math.sin(t * 1.2 + i * 0.14) * 1.6;
     ctx.strokeStyle = i % 3 === 0 ? 'rgba(76, 140, 62, 0.28)' : 'rgba(104, 170, 85, 0.22)';
