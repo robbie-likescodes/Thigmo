@@ -16,7 +16,9 @@ const ui = {
   turnInfo: document.getElementById('turn-info'), undoBtn: document.getElementById('undo-btn'), log: document.getElementById('log'),
   phaseBadge: document.getElementById('phase-badge'), feedback: document.getElementById('feedback'),
   winModal: document.getElementById('win-modal'), winTitle: document.getElementById('win-title'),
-  winAnnouncement: document.getElementById('win-announcement'), replayBtn: document.getElementById('replay-btn')
+  winAnnouncement: document.getElementById('win-announcement'), replayBtn: document.getElementById('replay-btn'),
+  mobileFlowerDock: document.getElementById('mobile-flower-dock'),
+  mobileFlowerIcon: document.getElementById('mobile-flower-icon'),
 };
 
 const state = {
@@ -37,6 +39,7 @@ const state = {
   hoverTileId: null,
   hoverPlaceTileId: null,
   touch: { mode: 'none', startX: 0, startY: 0, startYaw: 0, startPitch: 0, moved: false, pinchDist: 0, pinchZoom: 1, suppressClickUntil: 0 },
+  mobilePlaceDrag: { active: false, snappedTileId: null },
 };
 
 const canvas = document.createElement('canvas');
@@ -621,7 +624,18 @@ function refresh(){
   const phaseText = state.winner ? `${state.winner.toUpperCase()} WINS` : (state.phase==='selectTile' ? 'Move a tile' : state.phase==='selectDest' ? 'Select destination' : 'Place a piece');
   ui.turnInfo.textContent = `${state.turn[0].toUpperCase()+state.turn.slice(1)} Turn · ${phaseText}`;
   document.getElementById('app-shell').style.setProperty('--edge-glow', state.turn==='purple' ? '#8f66ff88' : '#ffb14f88');
+  syncMobileFlowerDock();
   draw();
+}
+
+function isMobileViewport(){ return window.matchMedia('(max-width: 900px)').matches; }
+function syncMobileFlowerDock(){
+  if (!ui.mobileFlowerIcon || !ui.mobileFlowerDock) return;
+  const ready = isMobileViewport() && !state.winner && state.phase === 'place';
+  ui.mobileFlowerDock.style.display = isMobileViewport() ? 'block' : 'none';
+  ui.mobileFlowerIcon.classList.toggle('ready', ready);
+  ui.mobileFlowerIcon.classList.toggle('purple', state.turn === 'purple');
+  ui.mobileFlowerIcon.classList.toggle('orange', state.turn === 'orange');
 }
 
 function nearestTile(mx,my){
@@ -680,13 +694,19 @@ function handleBoardClick(mx,my){
   }
   if(state.phase==='place'){
     const t=nearestTile(mx,my); if(!t) return;
-    state.stacks.get(key(t.pos.x,t.pos.y)).push(state.turn);
-    resolveCaptures(state.turn);
-    if(state.captures[state.turn] >= WIN_CAPTURES){ state.winner=state.turn; showWinModal(state.turn); refresh(); return; }
-    state.turn = other(state.turn);
-    if(state.openingRound>0) state.openingRound -= 1;
-    state.phase='selectTile'; state.selectedTileId=null; state.hoverPlaceTileId=null; refresh();
+    placeFlowerOnTile(t.tid);
   }
+}
+
+function placeFlowerOnTile(tileId){
+  const pos = state.tiles.get(tileId);
+  if (!pos || state.phase !== 'place' || state.winner) return;
+  state.stacks.get(key(pos.x,pos.y)).push(state.turn);
+  resolveCaptures(state.turn);
+  if(state.captures[state.turn] >= WIN_CAPTURES){ state.winner=state.turn; showWinModal(state.turn); refresh(); return; }
+  state.turn = other(state.turn);
+  if(state.openingRound>0) state.openingRound -= 1;
+  state.phase='selectTile'; state.selectedTileId=null; state.hoverPlaceTileId=null; refresh();
 }
 
 
@@ -794,6 +814,45 @@ canvas.addEventListener('touchend', (e)=>{
   }
   if (e.touches.length === 0) state.touch.mode = 'none';
 }, { passive: true });
+
+
+if (ui.mobileFlowerIcon) {
+  const dragMove = (clientX, clientY)=>{
+    const { mx, my } = canvasPointFromClient(clientX, clientY);
+    const tile = nearestTile(mx, my);
+    state.mobilePlaceDrag.snappedTileId = tile ? tile.tid : null;
+    state.hoverPlaceTileId = state.mobilePlaceDrag.snappedTileId;
+    draw();
+  };
+  ui.mobileFlowerIcon.addEventListener('pointerdown', (e)=>{
+    if (!isMobileViewport() || state.phase !== 'place' || state.winner) return;
+    e.preventDefault();
+    ui.mobileFlowerIcon.setPointerCapture(e.pointerId);
+    state.mobilePlaceDrag.active = true;
+    state.mobilePlaceDrag.snappedTileId = null;
+    state.hoverPlaceTileId = null;
+  });
+  ui.mobileFlowerIcon.addEventListener('pointermove', (e)=>{
+    if (!state.mobilePlaceDrag.active) return;
+    dragMove(e.clientX, e.clientY);
+  });
+  ui.mobileFlowerIcon.addEventListener('pointerup', (e)=>{
+    if (!state.mobilePlaceDrag.active) return;
+    state.mobilePlaceDrag.active = false;
+    ui.mobileFlowerIcon.releasePointerCapture(e.pointerId);
+    const dropTileId = state.mobilePlaceDrag.snappedTileId;
+    state.mobilePlaceDrag.snappedTileId = null;
+    state.hoverPlaceTileId = null;
+    if (dropTileId) placeFlowerOnTile(dropTileId);
+    else draw();
+  });
+  ui.mobileFlowerIcon.addEventListener('pointercancel', ()=>{
+    state.mobilePlaceDrag.active = false;
+    state.mobilePlaceDrag.snappedTileId = null;
+    state.hoverPlaceTileId = null;
+    draw();
+  });
+}
 
 if (ui.undoBtn) ui.undoBtn.addEventListener('click',()=>{ if(state.undoSnapshot){ restore(state.undoSnapshot); log('Turn undone.'); }});
 if (ui.replayBtn) ui.replayBtn.addEventListener('click', restartGame);

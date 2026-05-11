@@ -87,6 +87,42 @@ button { border:1px solid #9da78a; background:#fff9ef; border-radius:10px; paddi
 button:hover { background:#f4f8e8; }
 label { display:flex; align-items:center; gap:6px; }
 canvas { display:block; }
+.mobile-flower-dock {
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 4;
+  pointer-events: none;
+  display: none;
+}
+
+.mobile-flower-icon {
+  width: 56px;
+  height: 56px;
+  border-radius: 16px;
+  border: 2px solid rgba(255,255,255,0.8);
+  box-shadow: 0 6px 16px rgba(0,0,0,0.26);
+  background: radial-gradient(circle at 35% 30%, #fffaf0, #efe5cc);
+  opacity: 0;
+  transform: scale(0.92);
+  transition: opacity .16s ease, transform .16s ease;
+  touch-action: none;
+}
+
+.mobile-flower-icon.ready {
+  opacity: 1;
+  transform: scale(1);
+  pointer-events: auto;
+}
+
+.mobile-flower-icon.purple {
+  background: radial-gradient(circle at 35% 30%, #efe7ff, #c7b2ff 68%, #9260ff);
+}
+
+.mobile-flower-icon.orange {
+  background: radial-gradient(circle at 35% 30%, #fff5de, #ffd18a 68%, #ff9f42);
+}
 
 
 .win-modal {
@@ -148,5 +184,8 @@ canvas { display:block; }
   .controls-inline button {
     min-height: 44px;
     padding: 8px 12px;
+  }
+  .mobile-flower-dock {
+    display: block;
   }
 }
