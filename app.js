@@ -286,45 +286,67 @@ function drawVineConnections(){
   }
 }
 
+function drawTile(pos, movable, selected){
+  const { sx, sy } = worldToScreen(pos.x, pos.y);
+  const size = 62;
+  const r = 10;
+  const x = sx - size / 2;
+  const y = sy - size / 2;
+  const fill = selected ? '#fef3c7' : movable ? '#dbeafe' : '#f6f0e6';
+  const stroke = selected ? '#d97706' : movable ? '#3b82f6' : '#8b7a63';
 
-function drawWiltingEffects(){
-  const now = performance.now();
-  for (const effect of state.wiltingEffects){
-    const t = Math.min(1, (now - effect.start) / effect.duration);
-    const {sx,sy} = worldToScreen(effect.x,effect.y);
-    const stemBaseY = sy - 3 - effect.z*18;
-    const droop = 4 + t*18;
-    const sway = Math.sin((now*0.006) + effect.wobbleSeed) * (1-t) * 4;
-    const palette = effect.color === 'purple'
-      ? { stem:'#6f4ed9', petal:'#aa8dff', core:'#efe3ff' }
-      : { stem:'#d67a22', petal:'#ffbf73', core:'#fff1dc' };
+  ctx.fillStyle = fill;
+  ctx.strokeStyle = stroke;
+  ctx.lineWidth = selected ? 4 : 2;
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.lineTo(x + size - r, y);
+  ctx.quadraticCurveTo(x + size, y, x + size, y + r);
+  ctx.lineTo(x + size, y + size - r);
+  ctx.quadraticCurveTo(x + size, y + size, x + size - r, y + size);
+  ctx.lineTo(x + r, y + size);
+  ctx.quadraticCurveTo(x, y + size, x, y + size - r);
+  ctx.lineTo(x, y + r);
+  ctx.quadraticCurveTo(x, y, x + r, y);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+}
 
-    ctx.save();
-    ctx.globalAlpha = 0.9 - t*0.8;
-    ctx.strokeStyle = palette.stem;
-    ctx.lineWidth = 3;
-    ctx.lineCap = 'round';
+function drawFlower(player, sx, sy, z, topPiece){
+  const py = sy - z * 18;
+  const pal = player === 'purple'
+    ? { petal: '#7c3aed', edge: '#5b21b6', core: '#e9d5ff' }
+    : { petal: '#f59e0b', edge: '#b45309', core: '#fff7d6' };
+  const r = topPiece ? 10 : 8.5;
+
+  ctx.fillStyle = pal.petal;
+  for (let i = 0; i < 6; i++) {
+    const a = (Math.PI * 2 * i) / 6;
+    const px = sx + Math.cos(a) * (r * 0.95);
+    const py2 = py + Math.sin(a) * (r * 0.95);
     ctx.beginPath();
-    ctx.moveTo(sx, stemBaseY + 10);
-    ctx.quadraticCurveTo(sx + sway*0.5, stemBaseY - 6 + droop*0.25, sx + sway, stemBaseY - 20 + droop);
-    ctx.stroke();
-
-    const bloomX = sx + sway;
-    const bloomY = stemBaseY - 26 + droop;
-    ctx.translate(bloomX, bloomY);
-    ctx.rotate((t*1.15) + sway*0.04);
-    ctx.fillStyle = palette.petal;
-    for (let i=0;i<5;i++){
-      ctx.rotate((Math.PI*2)/5);
-      ctx.beginPath();
-      ctx.ellipse(0, -6 - t*2, 3.3, 7.5 - t*2.5, 0, 0, Math.PI*2);
-      ctx.fill();
-    }
-    ctx.fillStyle = palette.core;
-    ctx.beginPath();
-    ctx.arc(0,0,2.8,0,Math.PI*2);
+    ctx.ellipse(px, py2, r * 0.58, r * 0.42, a, 0, Math.PI * 2);
     ctx.fill();
-    ctx.restore();
+  }
+  ctx.strokeStyle = pal.edge;
+  ctx.lineWidth = 1.6;
+  ctx.beginPath();
+  ctx.arc(sx, py, r * 0.95, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.fillStyle = pal.core;
+  ctx.beginPath();
+  ctx.arc(sx, py, r * 0.44, 0, Math.PI * 2);
+  ctx.fill();
+}
+
+function resizeCanvas() {
+  const rect = ui.viewport.getBoundingClientRect();
+  const nextWidth = Math.max(640, Math.round(rect.width));
+  const nextHeight = Math.max(420, Math.round(rect.height));
+  if (canvas.width !== nextWidth || canvas.height !== nextHeight) {
+    canvas.width = nextWidth;
+    canvas.height = nextHeight;
   }
 }
 
@@ -353,8 +375,7 @@ function draw(){
     if(stack.length>=6){ ctx.fillStyle='rgba(255,255,255,.85)'; ctx.font='bold 14px Inter'; ctx.fillText(String(stack.length),sx+20,sy-stack.length*18); }
   }
 
-  drawWiltingEffects();
-  if (ui.libertyToggle.checked) drawLibertyAssist();
+  if (ui.showLiberties?.checked) drawLibertyAssist();
 }
 
 function drawLibertyAssist(){
@@ -438,11 +459,11 @@ canvas.addEventListener('click', (e)=>{
 });
 
 if (ui.undoBtn) ui.undoBtn.addEventListener('click',()=>{ if(state.undoSnapshot){ restore(state.undoSnapshot); log('Turn undone.'); }});
-if (ui.spacing) ui.spacing.addEventListener('input',()=>{ state.tileSpacing=56+Number(ui.spacing.value)*10; draw(); });
-if (ui.libertyToggle) ui.libertyToggle.addEventListener('change',draw);
+if (ui.showLiberties) ui.showLiberties.addEventListener('change',draw);
 function tick(ts){ state.t=ts; draw(); requestAnimationFrame(tick); }
 
 log('Thigmo botanical battlefield loaded.');
+resizeCanvas();
 init();
 
 window.addEventListener('resize', ()=>{ resizeCanvas(); draw(); });
