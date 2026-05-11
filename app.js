@@ -472,7 +472,12 @@ function fitCameraToBoard(){
 
 
 
-function ensureBoardVisible(){
+function ensureCoordinateVisible(x, y){
+  const { sx, sy } = worldToScreen(x, y);
+  const marginX = canvas.width * 0.12;
+  const marginY = canvas.height * 0.15;
+  const isOffscreen = sx < marginX || sx > canvas.width - marginX || sy < marginY || sy > canvas.height - marginY;
+  if (!isOffscreen) return;
   state.camera.userAdjusted = false;
   fitCameraToBoard();
 }
@@ -658,7 +663,7 @@ canvas.addEventListener('click', (e)=>{
   if(state.phase==='selectTile'){
     const t=nearestTile(mx,my); if(!t) return;
     if(!state.legalMoves.some(m=>m.tid===t.tid)) return;
-    state.selectedTileId=t.tid; state.phase='selectDest'; ensureBoardVisible(); refresh(); return;
+    state.selectedTileId=t.tid; state.phase='selectDest'; ensureCoordinateVisible(t.pos.x, t.pos.y); refresh(); return;
   }
   if(state.phase==='selectDest'){
     const m=nearestGhost(mx,my); if(!m) return;
@@ -669,7 +674,7 @@ canvas.addEventListener('click', (e)=>{
     state.undoSnapshot = snapshot();
     const p=state.tiles.get(m.tid); const fromK=key(p.x,p.y), toK=key(m.to.x,m.to.y); const stack=state.stacks.get(fromK);
     state.stacks.delete(fromK); state.stacks.set(toK,stack); p.x=m.to.x; p.y=m.to.y;
-    state.phase='place'; ensureBoardVisible(); log(`${state.turn} moved tile to (${p.x}, ${p.y})`); refresh(); return;
+    state.phase='place'; ensureCoordinateVisible(p.x, p.y); log(`${state.turn} moved tile to (${p.x}, ${p.y})`); refresh(); return;
   }
   if(state.phase==='place'){
     const t=nearestTile(mx,my); if(!t) return;
