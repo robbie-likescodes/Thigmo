@@ -235,28 +235,32 @@ function worldToScreen(x, y, height = 0){
   const centerTileY = (Math.min(...ys) + Math.max(...ys)) * 0.5;
 
   const localX = (x - centerTileX) * state.tileSpacing;
-  const localZ = (y - centerTileY) * state.tileSpacing * 0.85;
-  const localY = height;
+  const localY = (y - centerTileY) * state.tileSpacing * 0.85;
 
   const { yaw, pitch, zoom } = state.camera;
   const yawCos = Math.cos(yaw), yawSin = Math.sin(yaw);
-  const x1 = localX * yawCos - localZ * yawSin;
-  const z1 = localX * yawSin + localZ * yawCos;
+  const rotX = localX * yawCos - localY * yawSin;
+  const rotY = localX * yawSin + localY * yawCos;
 
-  const pitchCos = Math.cos(pitch), pitchSin = Math.sin(pitch);
-  const y2 = localY * pitchCos - z1 * pitchSin;
-  const z2 = localY * pitchSin + z1 * pitchCos;
-
-  const focal = 760;
-  const perspective = focal / Math.max(220, focal + z2);
-  const scale = zoom * perspective;
+  const floorTilt = Math.cos(pitch);
+  const heightLift = Math.max(0.45, Math.cos(pitch * 0.72));
 
   return {
-    sx: canvas.width * 0.5 + x1 * scale,
-    sy: canvas.height * 0.56 - y2 * scale,
-    depth: z2,
-    scale,
+    sx: canvas.width * 0.5 + rotX * zoom,
+    sy: canvas.height * 0.56 + rotY * zoom * floorTilt - height * zoom * heightLift,
+    depth: rotY,
+    scale: zoom,
   };
+}
+
+function tileCorners(x, y){
+  const half = 0.5;
+  return [
+    worldToScreen(x - half, y - half),
+    worldToScreen(x + half, y - half),
+    worldToScreen(x + half, y + half),
+    worldToScreen(x - half, y + half),
+  ];
 }
 
 function tileCorners(x, y){
