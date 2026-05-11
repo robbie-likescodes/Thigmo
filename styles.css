@@ -13,6 +13,53 @@ body {
   color: var(--ink);
   background: radial-gradient(circle at 10% 0%, #eff8dd, #c8dbb2 60%, #9db588);
 }
+
+.sun-emblem {
+  position: absolute;
+  top: 16px;
+  left: 18px;
+  width: 36px;
+  height: 36px;
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+  z-index: 2;
+}
+
+.sun-core {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 30% 30%, #fff4aa, #ffd34d 70%, #e8a91d);
+  box-shadow: 0 0 6px #ffd64a99;
+}
+
+.sun-ray {
+  position: absolute;
+  width: 2px;
+  height: 10px;
+  border-radius: 999px;
+  background: linear-gradient(180deg, #fff2ad, #f7bb38);
+  transform-origin: 50% 18px;
+  animation: rayWigglePulse 2.8s ease-in-out infinite;
+  --ray-angle: 0deg;
+}
+
+.ray-1 { --ray-angle: 0deg; animation-delay: 0s; }
+.ray-2 { --ray-angle: 45deg; animation-delay: .2s; }
+.ray-3 { --ray-angle: 90deg; animation-delay: .4s; }
+.ray-4 { --ray-angle: 135deg; animation-delay: .6s; }
+.ray-5 { --ray-angle: 180deg; animation-delay: .8s; }
+.ray-6 { --ray-angle: 225deg; animation-delay: 1s; }
+.ray-7 { --ray-angle: 270deg; animation-delay: 1.2s; }
+.ray-8 { --ray-angle: 315deg; animation-delay: 1.4s; }
+
+@keyframes rayWigglePulse {
+  0%, 100% { opacity: .4; transform: rotate(calc(var(--ray-angle) - 4deg)) translateY(-12px) scaleY(.82); }
+  25% { opacity: .66; transform: rotate(calc(var(--ray-angle) + 3deg)) translateY(-13px) scaleY(.93); }
+  50% { opacity: .92; transform: rotate(calc(var(--ray-angle) - 2deg)) translateY(-14px) scaleY(1.08); }
+  75% { opacity: .72; transform: rotate(calc(var(--ray-angle) + 4deg)) translateY(-13px) scaleY(.95); }
+}
 #app-shell { display:grid; grid-template-columns: 1fr 310px; grid-template-rows: auto 1fr; height:100vh; border: 8px solid var(--edge-glow); transition: border-color .4s ease; }
 .top-bar {
   grid-column:1/3; display:flex; align-items:center; gap:16px; padding:10px 14px;
