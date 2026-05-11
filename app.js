@@ -286,14 +286,14 @@ function drawVineConnections(){
   }
 }
 
-function drawTile(pos, movable, selected){
+function drawTile(pos, movable, selected, selectedStroke){
   const { sx, sy } = worldToScreen(pos.x, pos.y);
   const size = 62;
   const r = 10;
   const x = sx - size / 2;
   const y = sy - size / 2;
   const fill = selected ? '#fef3c7' : movable ? '#dbeafe' : '#f6f0e6';
-  const stroke = selected ? '#d97706' : movable ? '#3b82f6' : '#8b7a63';
+  const stroke = selected ? selectedStroke : movable ? '#3b82f6' : '#8b7a63';
 
   ctx.fillStyle = fill;
   ctx.strokeStyle = stroke;
@@ -366,7 +366,8 @@ function draw(){
   }
 
   for(const [tid,pos] of state.tiles){
-    drawTile(pos, state.phase==='selectTile'&&state.legalMoves.some(m=>m.tid===tid), state.hoverTileId===tid || state.selectedTileId===tid);
+    const isSelected = state.selectedTileId===tid || (state.phase==='selectTile' && state.hoverTileId===tid);
+    drawTile(pos, state.phase==='selectTile'&&state.legalMoves.some(m=>m.tid===tid), isSelected, highlight.solid);
   }
   drawVineConnections();
   for(const [tid,pos] of state.tiles){
