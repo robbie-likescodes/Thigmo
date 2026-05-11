@@ -36,6 +36,7 @@ const state = {
   drag: { active: false, moved: false, startX: 0, startY: 0, startYaw: 0, startPitch: 0 },
   hoverTileId: null,
   hoverPlaceTileId: null,
+  touch: { mode: 'none', startX: 0, startY: 0, startYaw: 0, startPitch: 0, moved: false, pinchDist: 0, pinchZoom: 1 },
 };
 
 const canvas = document.createElement('canvas');
@@ -644,6 +645,49 @@ function nearestGhost(mx,my){
   }
   return bestScore<1 ? best : null;
 }
+function canvasPointFromClient(clientX, clientY){
+  const rect=canvas.getBoundingClientRect();
+  return {
+    mx:(clientX-rect.left)*(canvas.width/rect.width),
+    my:(clientY-rect.top)*(canvas.height/rect.height),
+  };
+}
+function handleBoardClick(mx,my){
+  if (state.winner || state.drag.moved || state.touch.moved) { state.drag.moved = false; state.touch.moved = false; return; }
+  if(state.phase==='selectTile'){
+    const t=nearestTile(mx,my); if(!t) return;
+    if(!state.legalMoves.some(m=>m.tid===t.tid)) return;
+    state.selectedTileId=t.tid; state.phase='selectDest'; state.hoverPlaceTileId=null; ensureCoordinateVisible(t.pos.x, t.pos.y); refresh(); return;
+  }
+  if(state.phase==='selectDest'){
+    const selectedTile = nearestTile(mx,my);
+    if (selectedTile?.tid === state.selectedTileId) {
+      state.phase = 'selectTile';
+      state.selectedTileId = null;
+      state.hoverPlaceTileId = null;
+      refresh();
+      return;
+    }
+    const m=nearestGhost(mx,my); if(!m) return;
+    if (!isLegalTileTranslation(m.tid, m.to.x, m.to.y, state.turn)) {
+      log('Illegal move: must be a 1-step influenced move to an empty coordinate that preserves orthogonal connectivity.');
+      return;
+    }
+    state.undoSnapshot = snapshot();
+    const p=state.tiles.get(m.tid); const fromK=key(p.x,p.y), toK=key(m.to.x,m.to.y); const stack=state.stacks.get(fromK);
+    state.stacks.delete(fromK); state.stacks.set(toK,stack); p.x=m.to.x; p.y=m.to.y;
+    state.phase='place'; state.hoverPlaceTileId=null; ensureCoordinateVisible(p.x, p.y); log(`${state.turn} moved tile to (${p.x}, ${p.y})`); refresh(); return;
+  }
+  if(state.phase==='place'){
+    const t=nearestTile(mx,my); if(!t) return;
+    state.stacks.get(key(t.pos.x,t.pos.y)).push(state.turn);
+    resolveCaptures(state.turn);
+    if(state.captures[state.turn] >= WIN_CAPTURES){ state.winner=state.turn; showWinModal(state.turn); refresh(); return; }
+    state.turn = other(state.turn);
+    if(state.openingRound>0) state.openingRound -= 1;
+    state.phase='selectTile'; state.selectedTileId=null; state.hoverPlaceTileId=null; refresh();
+  }
+}
 
 
 
@@ -699,45 +743,55 @@ canvas.addEventListener('wheel', (e)=>{
   draw();
 }, { passive: false });
 canvas.addEventListener('click', (e)=>{
-  if (state.winner || state.drag.moved) { state.drag.moved = false; return; }
-  const rect=canvas.getBoundingClientRect();
-  const mx=(e.clientX-rect.left)*(canvas.width/rect.width);
-  const my=(e.clientY-rect.top)*(canvas.height/rect.height);
-
-  if(state.phase==='selectTile'){
-    const t=nearestTile(mx,my); if(!t) return;
-    if(!state.legalMoves.some(m=>m.tid===t.tid)) return;
-    state.selectedTileId=t.tid; state.phase='selectDest'; state.hoverPlaceTileId=null; ensureCoordinateVisible(t.pos.x, t.pos.y); refresh(); return;
-  }
-  if(state.phase==='selectDest'){
-    const selectedTile = nearestTile(mx,my);
-    if (selectedTile?.tid === state.selectedTileId) {
-      state.phase = 'selectTile';
-      state.selectedTileId = null;
-      state.hoverPlaceTileId = null;
-      refresh();
-      return;
-    }
-    const m=nearestGhost(mx,my); if(!m) return;
-    if (!isLegalTileTranslation(m.tid, m.to.x, m.to.y, state.turn)) {
-      log('Illegal move: must be a 1-step influenced move to an empty coordinate that preserves orthogonal connectivity.');
-      return;
-    }
-    state.undoSnapshot = snapshot();
-    const p=state.tiles.get(m.tid); const fromK=key(p.x,p.y), toK=key(m.to.x,m.to.y); const stack=state.stacks.get(fromK);
-    state.stacks.delete(fromK); state.stacks.set(toK,stack); p.x=m.to.x; p.y=m.to.y;
-    state.phase='place'; state.hoverPlaceTileId=null; ensureCoordinateVisible(p.x, p.y); log(`${state.turn} moved tile to (${p.x}, ${p.y})`); refresh(); return;
-  }
-  if(state.phase==='place'){
-    const t=nearestTile(mx,my); if(!t) return;
-    state.stacks.get(key(t.pos.x,t.pos.y)).push(state.turn);
-    resolveCaptures(state.turn);
-    if(state.captures[state.turn] >= WIN_CAPTURES){ state.winner=state.turn; showWinModal(state.turn); refresh(); return; }
-    state.turn = other(state.turn);
-    if(state.openingRound>0) state.openingRound -= 1;
-    state.phase='selectTile'; state.selectedTileId=null; state.hoverPlaceTileId=null; refresh();
-  }
+  const { mx, my } = canvasPointFromClient(e.clientX, e.clientY);
+  handleBoardClick(mx, my);
 });
+canvas.addEventListener('touchstart', (e)=>{
+  if (e.touches.length === 1) {
+    const t = e.touches[0];
+    const { mx, my } = canvasPointFromClient(t.clientX, t.clientY);
+    const canRotate = !nearestTile(mx,my) && !nearestGhost(mx,my);
+    state.touch.mode = canRotate ? 'rotate' : 'tap';
+    state.touch.moved = false;
+    state.touch.startX = t.clientX;
+    state.touch.startY = t.clientY;
+    state.touch.startYaw = state.camera.yaw;
+    state.touch.startPitch = state.camera.pitch;
+  } else if (e.touches.length === 2) {
+    const a = e.touches[0], b = e.touches[1];
+    state.touch.mode = 'pinch';
+    state.touch.pinchDist = Math.max(1, Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY));
+    state.touch.pinchZoom = state.camera.zoom;
+    state.touch.moved = true;
+  }
+}, { passive: true });
+canvas.addEventListener('touchmove', (e)=>{
+  if (state.touch.mode === 'rotate' && e.touches.length === 1) {
+    const t = e.touches[0];
+    const dx = t.clientX - state.touch.startX;
+    const dy = t.clientY - state.touch.startY;
+    if (Math.abs(dx) + Math.abs(dy) > 4) state.touch.moved = true;
+    state.camera.userAdjusted = true;
+    state.camera.yaw = state.touch.startYaw + dx * 0.0075;
+    state.camera.pitch = Math.max(0.35, Math.min(0.98, state.touch.startPitch + dy * 0.0048));
+    draw();
+  } else if (state.touch.mode === 'pinch' && e.touches.length === 2) {
+    const a = e.touches[0], b = e.touches[1];
+    const dist = Math.max(1, Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY));
+    const factor = dist / state.touch.pinchDist;
+    state.camera.userAdjusted = true;
+    state.camera.zoom = Math.max(0.85, Math.min(2.6, state.touch.pinchZoom * factor));
+    draw();
+  }
+}, { passive: true });
+canvas.addEventListener('touchend', (e)=>{
+  if (state.touch.mode === 'tap' && e.changedTouches.length) {
+    const t = e.changedTouches[0];
+    const { mx, my } = canvasPointFromClient(t.clientX, t.clientY);
+    handleBoardClick(mx, my);
+  }
+  if (e.touches.length === 0) state.touch.mode = 'none';
+}, { passive: true });
 
 if (ui.undoBtn) ui.undoBtn.addEventListener('click',()=>{ if(state.undoSnapshot){ restore(state.undoSnapshot); log('Turn undone.'); }});
 if (ui.replayBtn) ui.replayBtn.addEventListener('click', restartGame);

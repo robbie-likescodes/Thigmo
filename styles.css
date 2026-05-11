@@ -76,6 +76,11 @@ body {
 .rules-link:hover { background:#f4fff0; }
 button { border:1px solid #8ba780; background:#fff; border-radius:8px; padding:6px 10px; cursor:pointer; }
 #viewport { position:relative; overflow:hidden; }
+.top-bar, .side-panel, #viewport { min-width: 0; }
+.controls-inline button, .controls-inline .rules-link { min-height: 40px; }
+.controls-inline .rules-link, .controls-inline button { display: inline-flex; align-items: center; }
+.side-panel { -webkit-overflow-scrolling: touch; }
+canvas { touch-action: none; }
 .side-panel { background: linear-gradient(180deg, #f8f3e8, #efeadf); border-left:1px solid #b0a88f; padding:12px; overflow:auto; }
 #log { font-size:.85rem; max-height: 40vh; overflow:auto; background:#fffdf8; border:1px solid #d7cfb9; padding:8px; border-radius:8px; }
 button { border:1px solid #9da78a; background:#fff9ef; border-radius:10px; padding:6px 11px; cursor:pointer; color:#2f3e27; }
@@ -115,4 +120,33 @@ canvas { display:block; }
 .replay-btn {
   margin-top: 12px;
   font-weight: 700;
+}
+
+@media (max-width: 900px) {
+  #app-shell {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto minmax(56dvh, 1fr) auto;
+    height: 100dvh;
+  }
+  .top-bar {
+    grid-column: 1;
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: 8px 10px;
+  }
+  .brand { font-size: 1rem; }
+  .scoreboard { flex-wrap: wrap; }
+  .turn-info { width: 100%; margin-left: 0; order: 3; }
+  #viewport { min-height: 56dvh; }
+  .side-panel {
+    border-left: none;
+    border-top: 1px solid #b0a88f;
+    max-height: 28dvh;
+    padding: 10px;
+  }
+  .controls-inline .rules-link,
+  .controls-inline button {
+    min-height: 44px;
+    padding: 8px 12px;
+  }
 }
