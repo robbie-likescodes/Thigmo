@@ -23,6 +23,8 @@ const state = {
   undoSnapshot: null,
   winner: null,
   wiltingEffects: [],
+  camera: { yaw: -0.55, pitch: 0.75, zoom: 1 },
+  drag: { active: false, moved: false, startX: 0, startY: 0, startYaw: 0, startPitch: 0 },
 };
 
 const canvas = document.createElement('canvas');
@@ -222,11 +224,41 @@ function resolveCaptures(active){
   }
 }
 
-function worldToScreen(x,y){
-  const centerX = canvas.width*0.45;
-  const centerY = canvas.height*0.5;
-  return { sx: centerX + x*state.tileSpacing, sy: centerY + y*state.tileSpacing*0.85 };
+function worldToScreen(x, y, height = 0){
+  if (state.tiles.size === 0) {
+    return { sx: canvas.width * 0.5, sy: canvas.height * 0.5, depth: 0, scale: 1 };
+  }
+
+  const xs = [...state.tiles.values()].map((t)=>t.x);
+  const ys = [...state.tiles.values()].map((t)=>t.y);
+  const centerTileX = (Math.min(...xs) + Math.max(...xs)) * 0.5;
+  const centerTileY = (Math.min(...ys) + Math.max(...ys)) * 0.5;
+
+  const baseX = (x - centerTileX) * state.tileSpacing;
+  const baseZ = (y - centerTileY) * state.tileSpacing * 0.85;
+  const baseY = height;
+
+  const { yaw, pitch, zoom } = state.camera;
+  const yawCos = Math.cos(yaw), yawSin = Math.sin(yaw);
+  const x1 = baseX * yawCos - baseZ * yawSin;
+  const z1 = baseX * yawSin + baseZ * yawCos;
+
+  const pitchCos = Math.cos(pitch), pitchSin = Math.sin(pitch);
+  const y2 = baseY * pitchCos - z1 * pitchSin;
+  const z2 = baseY * pitchSin + z1 * pitchCos;
+
+  const focal = 700;
+  const perspective = focal / Math.max(180, focal + z2);
+  const scale = perspective * zoom;
+
+  return {
+    sx: canvas.width * 0.5 + x1 * scale,
+    sy: canvas.height * 0.56 - y2 * scale,
+    depth: z2,
+    scale,
+  };
 }
+
 
 function activeTurnHighlight(){
   return state.turn === 'orange'
@@ -248,8 +280,8 @@ function drawVineConnections(){
       drawn.add(pairKey);
       const a = worldToScreen(x,y);
       const b = worldToScreen(nx,ny);
-      const ay = a.sy - 3 - z*18;
-      const by = b.sy - 3 - nz*18;
+      const ay = worldToScreen(x, y, z * 18).sy - 3;
+      const by = worldToScreen(nx, ny, nz * 18).sy - 3;
       const midX = (a.sx + b.sx) * 0.5;
       const midY = (ay + by) * 0.5;
       const curveBend = (x !== nx ? 12 : -12);
@@ -313,8 +345,8 @@ function drawTile(pos, movable, selected){
   ctx.stroke();
 }
 
-function drawFlower(player, sx, sy, z, topPiece){
-  const py = sy - z * 18;
+function drawFlower(player, x, y, z, topPiece){
+  const { sx, sy: pyFinal } = worldToScreen(x, y, z * 18);
   const pal = player === 'purple'
     ? { petal: '#7c3aed', edge: '#5b21b6', core: '#e9d5ff' }
     : { petal: '#f59e0b', edge: '#b45309', core: '#fff7d6' };
@@ -324,7 +356,7 @@ function drawFlower(player, sx, sy, z, topPiece){
   for (let i = 0; i < 6; i++) {
     const a = (Math.PI * 2 * i) / 6;
     const px = sx + Math.cos(a) * (r * 0.95);
-    const py2 = py + Math.sin(a) * (r * 0.95);
+    const py2 = pyFinal + Math.sin(a) * (r * 0.95);
     ctx.beginPath();
     ctx.ellipse(px, py2, r * 0.58, r * 0.42, a, 0, Math.PI * 2);
     ctx.fill();
@@ -332,11 +364,11 @@ function drawFlower(player, sx, sy, z, topPiece){
   ctx.strokeStyle = pal.edge;
   ctx.lineWidth = 1.6;
   ctx.beginPath();
-  ctx.arc(sx, py, r * 0.95, 0, Math.PI * 2);
+  ctx.arc(sx, pyFinal, r * 0.95, 0, Math.PI * 2);
   ctx.stroke();
   ctx.fillStyle = pal.core;
   ctx.beginPath();
-  ctx.arc(sx, py, r * 0.44, 0, Math.PI * 2);
+  ctx.arc(sx, pyFinal, r * 0.44, 0, Math.PI * 2);
   ctx.fill();
 }
 
@@ -371,7 +403,7 @@ function draw(){
   drawVineConnections();
   for(const [tid,pos] of state.tiles){
     const stack=state.stacks.get(key(pos.x,pos.y))||[]; const {sx,sy}=worldToScreen(pos.x,pos.y);
-    stack.forEach((p,z)=>drawFlower(p,sx,sy-3,z,z===stack.length-1));
+    stack.forEach((p,z)=>drawFlower(p,pos.x,pos.y,z,z===stack.length-1));
     if(stack.length>=6){ ctx.fillStyle='rgba(255,255,255,.85)'; ctx.font='bold 14px Inter'; ctx.fillText(String(stack.length),sx+20,sy-stack.length*18); }
   }
 
@@ -392,7 +424,8 @@ function drawLibertyAssist(){
   for(const l of assists){
     const [x,y,z]=l.split(',').map(Number);
     const {sx,sy}=worldToScreen(x,y);
-    ctx.beginPath(); ctx.arc(sx, sy - z*16, 6, 0, Math.PI*2); ctx.fill();
+    const stackPos = worldToScreen(x, y, z * 16);
+    ctx.beginPath(); ctx.arc(stackPos.sx, stackPos.sy, 6, 0, Math.PI*2); ctx.fill();
   }
 }
 
@@ -425,8 +458,45 @@ function nearestGhost(mx,my){
   return bestD<45 ? best : null;
 }
 
+
+
+canvas.addEventListener('mousedown', (e)=>{
+  const rect=canvas.getBoundingClientRect();
+  const mx=(e.clientX-rect.left)*(canvas.width/rect.width);
+  const my=(e.clientY-rect.top)*(canvas.height/rect.height);
+  const canRotate = !nearestTile(mx,my) && !nearestGhost(mx,my);
+  if (!canRotate) return;
+  state.drag.active = true;
+  state.drag.moved = false;
+  state.drag.startX = e.clientX;
+  state.drag.startY = e.clientY;
+  state.drag.startYaw = state.camera.yaw;
+  state.drag.startPitch = state.camera.pitch;
+});
+
+window.addEventListener('mousemove', (e)=>{
+  if (!state.drag.active) return;
+  const dx = e.clientX - state.drag.startX;
+  const dy = e.clientY - state.drag.startY;
+  if (Math.abs(dx) + Math.abs(dy) > 2) state.drag.moved = true;
+  state.camera.yaw = state.drag.startYaw + dx * 0.0075;
+  const nextPitch = state.drag.startPitch + dy * 0.006;
+  state.camera.pitch = Math.max(0.2, Math.min(1.35, nextPitch));
+  draw();
+});
+
+window.addEventListener('mouseup', ()=>{
+  state.drag.active = false;
+});
+
+canvas.addEventListener('wheel', (e)=>{
+  e.preventDefault();
+  const factor = Math.exp(-e.deltaY * 0.0012);
+  state.camera.zoom = Math.max(0.55, Math.min(2.6, state.camera.zoom * factor));
+  draw();
+}, { passive: false });
 canvas.addEventListener('click', (e)=>{
-  if (state.winner) return;
+  if (state.winner || state.drag.moved) { state.drag.moved = false; return; }
   const rect=canvas.getBoundingClientRect();
   const mx=(e.clientX-rect.left)*(canvas.width/rect.width);
   const my=(e.clientY-rect.top)*(canvas.height/rect.height);
