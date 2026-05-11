@@ -531,6 +531,7 @@ function draw(){
 
   // Mountain silhouettes sit on the horizon to give the meadow more depth.
   const mountainDrift = Math.sin(t * 0.12) * 8;
+  const mountainHeightScale = 4;
   const mountainLayers = [
     {
       color: 'rgba(120, 162, 166, 0.52)',
@@ -555,10 +556,10 @@ function draw(){
     ctx.beginPath();
     ctx.moveTo(0, canvas.height);
     const first = layer.points[0];
-    ctx.lineTo(first[0] * canvas.width, horizonY + first[1] + layer.baseOffset + mountainDrift * (0.6 + layerIndex * 0.22));
+    ctx.lineTo(first[0] * canvas.width, horizonY + (first[1] + layer.baseOffset + mountainDrift * (0.6 + layerIndex * 0.22)) * mountainHeightScale);
     for (let i = 1; i < layer.points.length; i++) {
       const [nx, ny] = layer.points[i];
-      ctx.lineTo(nx * canvas.width, horizonY + ny + layer.baseOffset + mountainDrift * (0.6 + layerIndex * 0.22));
+      ctx.lineTo(nx * canvas.width, horizonY + (ny + layer.baseOffset + mountainDrift * (0.6 + layerIndex * 0.22)) * mountainHeightScale);
     }
     ctx.lineTo(canvas.width, canvas.height);
     ctx.closePath();
