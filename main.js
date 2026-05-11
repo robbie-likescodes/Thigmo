@@ -331,8 +331,15 @@ function refresh(){
   state.legalMoves = legalMovesFor(state.turn);
   ui.scorePurple.textContent = state.captures.purple;
   ui.scoreOrange.textContent = state.captures.orange;
-  const phaseText = state.winner ? `${state.winner.toUpperCase()} WINS` : (state.phase==='selectTile' ? 'Move a tile' : state.phase==='selectDest' ? 'Select destination' : 'Place a piece');
-  ui.turnInfo.textContent = `${state.turn[0].toUpperCase()+state.turn.slice(1)} Turn · ${phaseText}`;
+  const playerName = state.turn[0].toUpperCase() + state.turn.slice(1);
+  const phaseText = state.winner
+    ? `${state.winner.toUpperCase()} WINS`
+    : state.phase === 'selectTile'
+      ? `${playerName} move a soil square`
+      : state.phase === 'selectDest'
+        ? `${playerName} choose destination`
+        : `${playerName} place a flower`;
+  ui.turnInfo.textContent = phaseText;
   document.getElementById('app-shell').style.setProperty('--edge-glow', state.turn==='purple' ? '#8f66ff88' : '#ffb14f88');
   draw();
 }
