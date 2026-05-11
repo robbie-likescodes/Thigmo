@@ -202,6 +202,58 @@ function activeTurnHighlight(){
     : { solid: 'rgba(122,60,255,0.85)', ghost: 'rgba(122,60,255,0.45)' };
 }
 
+function drawVineConnections(){
+  const occ = getOccupancy();
+  const drawn = new Set();
+  for (const [cell, color] of occ) {
+    const [x,y,z] = cell.split(',').map(Number);
+    const neighbors = [[x+1,y,z],[x,y+1,z]];
+    for (const [nx,ny,nz] of neighbors) {
+      const nKey = cellKey(nx,ny,nz);
+      if (occ.get(nKey) !== color) continue;
+      const pairKey = `${cell}|${nKey}`;
+      if (drawn.has(pairKey)) continue;
+      drawn.add(pairKey);
+      const a = worldToScreen(x,y);
+      const b = worldToScreen(nx,ny);
+      const ay = a.sy - 3 - z*18;
+      const by = b.sy - 3 - nz*18;
+      const midX = (a.sx + b.sx) * 0.5;
+      const midY = (ay + by) * 0.5;
+      const curveBend = (x !== nx ? 12 : -12);
+      const pal = color === 'purple'
+        ? {vine:'#6f4ed9', leaf:'#aa8dff', accent:'#5632b8'}
+        : {vine:'#d67a22', leaf:'#ffbf73', accent:'#b65f12'};
+
+      ctx.strokeStyle = pal.vine;
+      ctx.lineWidth = 5;
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      ctx.moveTo(a.sx, ay);
+      ctx.quadraticCurveTo(midX + curveBend, midY - curveBend*0.35, b.sx, by);
+      ctx.stroke();
+
+      const leafCount = 3;
+      for (let i=1;i<=leafCount;i++) {
+        const t = i/(leafCount+1);
+        const lx = (1-t)*(1-t)*a.sx + 2*(1-t)*t*(midX + curveBend) + t*t*b.sx;
+        const ly = (1-t)*(1-t)*ay + 2*(1-t)*t*(midY - curveBend*0.35) + t*t*by;
+        const dir = i%2===0 ? 1 : -1;
+        ctx.fillStyle = pal.leaf;
+        ctx.beginPath();
+        ctx.ellipse(lx + dir*6, ly - dir*3, 5.2, 2.8, dir*0.8, 0, Math.PI*2);
+        ctx.fill();
+        ctx.strokeStyle = pal.accent;
+        ctx.lineWidth = 1.2;
+        ctx.beginPath();
+        ctx.moveTo(lx, ly);
+        ctx.lineTo(lx + dir*6, ly - dir*3);
+        ctx.stroke();
+      }
+    }
+  }
+}
+
 function draw(){
   ctx.clearRect(0,0,canvas.width,canvas.height);
   ctx.fillStyle = '#bde6af'; ctx.fillRect(0,0,canvas.width,canvas.height);
@@ -217,23 +269,13 @@ function draw(){
   }
 
   for(const [tid,pos] of state.tiles){
-    const {sx,sy}=worldToScreen(pos.x,pos.y);
-    ctx.fillStyle = '#714625';
-    ctx.fillRect(sx-34,sy-34,68,68);
-
-    if (state.phase === 'selectTile' && state.legalMoves.some(m=>m.tid===tid)) {
-      ctx.strokeStyle = highlight.solid;
-      ctx.lineWidth = 3;
-      ctx.strokeRect(sx-36,sy-36,72,72);
-    }
-
-    const stack = state.stacks.get(key(pos.x,pos.y)) || [];
-    stack.forEach((p,z)=>{
-      const yOffset = sy - z*16;
-      ctx.fillStyle = p === 'purple' ? '#7a3cff' : '#ff9f1c';
-      ctx.beginPath(); ctx.arc(sx,yOffset,12,0,Math.PI*2); ctx.fill();
-      ctx.strokeStyle = p === 'purple' ? '#c9b5ff' : '#ffd19a'; ctx.lineWidth=2; ctx.stroke();
-    });
+    drawTile(pos, state.phase==='selectTile'&&state.legalMoves.some(m=>m.tid===tid), state.hoverTileId===tid || state.selectedTileId===tid);
+  }
+  drawVineConnections();
+  for(const [tid,pos] of state.tiles){
+    const stack=state.stacks.get(key(pos.x,pos.y))||[]; const {sx,sy}=worldToScreen(pos.x,pos.y);
+    stack.forEach((p,z)=>drawFlower(p,sx,sy-3,z,z===stack.length-1));
+    if(stack.length>=6){ ctx.fillStyle='rgba(255,255,255,.85)'; ctx.font='bold 14px Inter'; ctx.fillText(String(stack.length),sx+20,sy-stack.length*18); }
   }
 
   if (ui.libertyToggle.checked) drawLibertyAssist();
