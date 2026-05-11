@@ -1,4 +1,5 @@
-window.THIGMO_BUILD = '2026-05-10-polish-audit';
+window.THIGMO_BUILD = '2026-05-10-botanical-overhaul';
+
 const WIN_CAPTURES = 10;
 const MAX_STACK = 7;
 const ui = {
@@ -39,20 +40,27 @@ function draw(){ctx.clearRect(0,0,canvas.width,canvas.height);ctx.fillStyle='#bf
   if(ui.showLiberties.checked&&state.selectedTileId){const t=state.tiles.get(state.selectedTileId);if(t){const occ=getOcc();const stack=state.stacks.get(key(t.x,t.y))||[];if(stack.length){const start=ckey(t.x,t.y,stack.length-1);const g=groupFrom(start,occ),libs=liberties(g,occ);ctx.fillStyle='rgba(90,240,140,.7)';for(const l of libs){const [x,y,z]=l.split(',').map(Number);const {sx,sy}=worldToScreen(x,y);ctx.beginPath();ctx.arc(sx,sy-z*14,6,0,Math.PI*2);ctx.fill();}}}}
   state.captureFx=state.captureFx.filter(f=>f.t-->0);for(const fx of state.captureFx){const [x,y,z]=fx.c.split(',').map(Number);const {sx,sy}=worldToScreen(x,y);ctx.strokeStyle=`rgba(255,80,80,${fx.t/20})`;ctx.lineWidth=3;ctx.beginPath();ctx.arc(sx,sy-z*14,14+(20-fx.t),0,Math.PI*2);ctx.stroke();}
 }
-function refresh(){state.legalMoves=legalMovesFor(state.turn);ui.scorePurple.textContent=state.captures.purple;ui.scoreOrange.textContent=state.captures.orange;const phase=state.phase==='selectTile'?'Move Phase':state.phase==='selectDest'?'Destination Phase':'Place Phase';ui.phaseBadge.textContent=phase;ui.turnInfo.textContent=`${state.turn[0].toUpperCase()+state.turn.slice(1)} Turn · ${phase}`;updateDebug();draw();if(state.winner){ui.winModal.classList.remove('hidden');ui.winTitle.textContent=`${state.winner.toUpperCase()} WINS`;}}
-function nearestTile(mx,my){let b=null,bd=1e9;for(const [tid,p] of state.tiles){const {sx,sy}=worldToScreen(p.x,p.y);const d=Math.hypot(mx-sx,my-sy);if(d<bd){bd=d;b={tid,pos:p};}}return bd<44?b:null;}
-function nearestGhost(mx,my){if(state.phase!=='selectDest'||!state.selectedTileId)return null;let b=null,bd=1e9;for(const m of state.legalMoves.filter(m=>m.tid===state.selectedTileId)){const {sx,sy}=worldToScreen(m.to.x,m.to.y);const d=Math.hypot(mx-sx,my-sy);if(d<bd){bd=d;b=m;}}return bd<44?b:null;}
-function runAudit(){const issues=[];if(state.tiles.size!==8)issues.push(`Tile count ${state.tiles.size} != 8`);const coords=[...state.tiles.values()].map(p=>key(p.x,p.y));if(new Set(coords).size!==coords.length)issues.push('Duplicate tile coordinates found');for(const [k,s] of state.stacks){if(s.length>MAX_STACK)issues.push(`${k} over stack max (${s.length})`);if(s.some(v=>!v))issues.push(`${k} has gap/empty slot`);}for(const p of state.tiles.values())if(!orthAdjacentToAnyTile(p.x,p.y))issues.push(`Isolated tile at (${p.x},${p.y})`);return issues;}
-function updateDebug(){const infl=[...influencedTiles(state.turn)].join(', ');const legal=state.legalMoves.filter(m=>m.tid===state.selectedTileId).map(m=>`(${m.to.x},${m.to.y})`).join(' ');let out='Tiles:\n';for(const [tid,p] of state.tiles){out+=`${tid}: (${p.x},${p.y}) stack=[${(state.stacks.get(key(p.x,p.y))||[]).join(',')}]\n`;}out+=`\nSelected: ${state.selectedTileId||'-'}\nLegal dests: ${legal||'-'}\nInfluence (${state.turn}): ${infl||'-'}`;ui.debugOutput.textContent=out;}
-canvas.addEventListener('mousemove',e=>{const r=canvas.getBoundingClientRect();const mx=(e.clientX-r.left)*(canvas.width/r.width);const my=(e.clientY-r.top)*(canvas.height/r.height);state.hoverTile=nearestTile(mx,my)?.tid||null;});
-canvas.addEventListener('click',e=>{if(state.winner)return;const r=canvas.getBoundingClientRect();const mx=(e.clientX-r.left)*(canvas.width/r.width);const my=(e.clientY-r.top)*(canvas.height/r.height);
-if(state.phase==='selectTile'){const t=nearestTile(mx,my);if(!t){setFeedback('Pick a highlighted tile you influence.');return;}if(state.selectedTileId===t.tid){state.selectedTileId=null;setFeedback('Selection canceled.');refresh();return;}if(!state.legalMoves.some(m=>m.tid===t.tid)){setFeedback('Illegal: this tile is not movable now.');return;}state.selectedTileId=t.tid;state.phase='selectDest';setFeedback('Choose a highlighted destination.');refresh();return;}
-if(state.phase==='selectDest'){const clickedTile=nearestTile(mx,my);if(clickedTile&&clickedTile.tid===state.selectedTileId){state.selectedTileId=null;state.phase='selectTile';setFeedback('Selection canceled.');refresh();return;}const m=nearestGhost(mx,my);if(!m){setFeedback('Illegal: choose a legal ghost destination.');return;}state.undoSnapshot=snapshot();const p=state.tiles.get(m.tid),from=key(p.x,p.y),to=key(m.to.x,m.to.y);state.stacks.set(to,state.stacks.get(from));state.stacks.delete(from);p.x=m.to.x;p.y=m.to.y;state.phase='place';state.selectedTileId=m.tid;log(`${state.turn} moved tile to (${p.x},${p.y})`);setFeedback('Now place one bloom on any non-full tile.');refresh();return;}
-if(state.phase==='place'){const t=nearestTile(mx,my);if(!t){setFeedback('Illegal: click a tile to place bloom.');return;}const s=state.stacks.get(key(t.pos.x,t.pos.y));if(s.length>=MAX_STACK){setFeedback('Illegal: stack already full (7).');return;}s.push(state.turn);log(`${state.turn} placed on (${t.pos.x},${t.pos.y})`);resolveCaptures(state.turn);if(state.captures[state.turn]>=WIN_CAPTURES){state.winner=state.turn;log(`${state.turn} wins by capture goal!`,'log-win');refresh();return;}state.turn=other(state.turn);state.phase='selectTile';state.selectedTileId=null;setFeedback('Turn complete. Move phase.');refresh();}}
-);
-window.addEventListener('keydown',e=>{if(e.key==='Escape'&&state.phase==='selectDest'){state.phase='selectTile';state.selectedTileId=null;setFeedback('Selection canceled (Esc).');refresh();}});
-ui.undoBtn.addEventListener('click',()=>{if(!state.undoSnapshot){setFeedback('Nothing to undo yet.');return;}restore(state.undoSnapshot);state.undoSnapshot=null;setFeedback('Undid previous full turn.');log('Undo: previous turn restored.');});
-ui.showCoords.addEventListener('change',draw);ui.showLiberties.addEventListener('change',draw);
-ui.runAudit.addEventListener('click',()=>{const issues=runAudit();if(!issues.length){log('Rules audit: no problems found.');setFeedback('Rules audit passed.');}else{issues.forEach(i=>log(`Audit: ${i}`,'log-capture'));setFeedback(`Audit found ${issues.length} issue(s).`);}updateDebug();draw();});
-setInterval(draw,90);
-log('Thigmo loaded.'); init();
+
+function drawLibertyAssist(){ const enemy=other(state.turn),occ=getOccupancy(),seen=new Set(),assists=new Set(); for(const c of occ.keys()){ if(seen.has(c)||occ.get(c)!==enemy) continue; const g=groupFrom(c,occ); g.forEach(v=>seen.add(v)); liberties(g,occ).forEach(l=>assists.add(l)); } for(const l of assists){ const [x,y,z]=l.split(',').map(Number); const {sx,sy}=worldToScreen(x,y); ctx.fillStyle='rgba(196,255,178,.78)'; ctx.beginPath(); ctx.arc(sx,sy-z*18,5.3,0,Math.PI*2); ctx.fill(); }}
+
+function roundRect(x,y,w,h,r){ ctx.beginPath(); ctx.moveTo(x+r,y); ctx.arcTo(x+w,y,x+w,y+h,r); ctx.arcTo(x+w,y+h,x,y+h,r); ctx.arcTo(x,y+h,x,y,r); ctx.arcTo(x,y,x+w,y,r); ctx.closePath(); }
+function refresh(){ state.legalMoves=legalMovesFor(state.turn); ui.scorePurple.textContent=state.captures.purple; ui.scoreOrange.textContent=state.captures.orange; const phaseText=state.winner?`${state.winner.toUpperCase()} WINS`:(state.phase==='selectTile'?'Move living soil tile':state.phase==='selectDest'?'Select growth destination':'Plant invasive bloom'); ui.turnInfo.textContent=`${state.turn[0].toUpperCase()+state.turn.slice(1)} Turn · ${phaseText}`; document.getElementById('app-shell').style.setProperty('--edge-glow', state.turn==='purple' ? '#a084ff66' : '#ffbf7366'); draw(); }
+function nearestTile(mx,my){ let best=null,bestD=1e9; for(const [tid,pos] of state.tiles){ const {sx,sy}=worldToScreen(pos.x,pos.y); const d=Math.hypot(mx-sx,my-sy); if(d<bestD){bestD=d;best={tid,pos};}} return bestD<52?best:null; }
+function nearestGhost(mx,my){ if(state.phase!=='selectDest'||!state.selectedTileId) return null; let best=null,bestD=1e9; for(const m of state.legalMoves.filter(m=>m.tid===state.selectedTileId)){ const {sx,sy}=worldToScreen(m.to.x,m.to.y); const d=Math.hypot(mx-sx,my-sy); if(d<bestD){bestD=d;best=m;}} return bestD<55?best:null; }
+
+canvas.addEventListener('mousemove',(e)=>{ const r=canvas.getBoundingClientRect(); const mx=(e.clientX-r.left)*(canvas.width/r.width), my=(e.clientY-r.top)*(canvas.height/r.height); state.hoverTileId=nearestTile(mx,my)?.tid||null; state.hoverGhost=nearestGhost(mx,my); draw(); });
+canvas.addEventListener('click',(e)=>{ if(state.winner) return; const rect=canvas.getBoundingClientRect(); const mx=(e.clientX-rect.left)*(canvas.width/rect.width), my=(e.clientY-rect.top)*(canvas.height/rect.height);
+  if(state.phase==='selectTile'){ const t=nearestTile(mx,my); if(!t||!state.legalMoves.some(m=>m.tid===t.tid)) return; state.selectedTileId=t.tid; state.phase='selectDest'; refresh(); return; }
+  if(state.phase==='selectDest'){ const m=nearestGhost(mx,my); if(!m) return; state.undoSnapshot=snapshot(); const p=state.tiles.get(m.tid), fromK=key(p.x,p.y), toK=key(m.to.x,m.to.y), stack=state.stacks.get(fromK); state.stacks.delete(fromK); state.stacks.set(toK,stack); p.x=m.to.x; p.y=m.to.y; state.phase='place'; log(`${state.turn} shifted living earth to (${p.x}, ${p.y})`); refresh(); return; }
+  if(state.phase==='place'){ const t=nearestTile(mx,my); if(!t) return; state.stacks.get(key(t.pos.x,t.pos.y)).push(state.turn); resolveCaptures(state.turn); if(state.captures[state.turn]>=WIN_CAPTURES){ state.winner=state.turn; refresh(); return; } state.turn=other(state.turn); if(state.openingRound>0) state.openingRound-=1; state.phase='selectTile'; state.selectedTileId=null; refresh(); }
+});
+
+if (ui.undoBtn) ui.undoBtn.addEventListener('click',()=>{ if(state.undoSnapshot){ restore(state.undoSnapshot); log('Turn undone.'); }});
+if (ui.spacing) ui.spacing.addEventListener('input',()=>{ state.tileSpacing=56+Number(ui.spacing.value)*10; draw(); });
+if (ui.libertyToggle) ui.libertyToggle.addEventListener('change',draw);
+function tick(ts){ state.t=ts; draw(); requestAnimationFrame(tick); }
+
+log('Thigmo botanical battlefield loaded.');
+init();
+
+window.addEventListener('resize', ()=>{ resizeCanvas(); draw(); });
