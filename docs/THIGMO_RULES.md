@@ -1,128 +1,176 @@
-# Thigmo Rules
+# Thigmo Rules — *Botanical Battlefield*
 
-A complete, player-facing rulebook for the current playable version of **Thigmo**.
+Welcome to **Thigmo**, where rival floral lineages wage a slow, intelligent war for dominance of living soil.  
+Every stem, tendril, and rootlet competes for one destiny: become the reigning invasive species.
 
----
-
-## 1) Objective
-
-Capture your opponent's blooms. The first player to capture **10 enemy pieces** wins.
+This isn’t random growth.  
+This is **botanical strategy**.
 
 ---
 
-## 2) Components
+## 1) Objective: Rule the Soil
 
-- **8 terrain tiles** (the wooden squares you move around)
-- Two bloom colors:
-  - **Purple** player
-  - **Orange** player
-- A vertical stack space above every tile (pieces can be stacked)
+Your goal is to overrun your rival’s bloom network through positional pressure and oxygen starvation.
 
----
+- You win immediately when you have captured **10 enemy blooms**.
+- Captures happen through tactical encirclement and deprivation of growth space (liberties).
 
-## 3) Board and Space Model
-
-1. Tiles live on an infinite coordinate grid.
-2. Exactly **8 tiles** exist for the whole game.
-3. A tile can never share the same position with another tile.
-4. Pieces occupy vertical levels (`z = 0, 1, 2, ...`) above each tile.
-5. When a tile moves, the **entire stack on it moves with it**.
-6. A tile stack can hold up to **7 pieces**.
+Think of it as: *if their flowers can no longer breathe or expand, they wither—and you spread*.
 
 ---
 
-## 4) Turn Structure
+## 2) Components of the Living Battlefield
 
-On your turn, you must do these phases in order:
+- **8 terrain tiles** (the movable soil patches)
+- Two bloom factions:
+  - **Purple**
+  - **Orange**
+- A vertical growth column on each tile (stacks of blooms rising upward)
 
-### Phase A — Move one tile (required)
-
-1. Select one legal tile you influence.
-2. Move it **one step** to an adjacent square (8-direction movement: horizontal, vertical, or diagonal).
-3. Destination must be empty (no other tile there).
-4. The moved board must keep all tiles connected by orthogonal adjacency (no isolated tile).
-
-### Phase B — Place one bloom (required unless stack is full)
-
-1. Place one bloom of your color on any tile.
-2. You place on top of that tile's existing stack.
-3. You cannot place on a stack that is already at 7 pieces.
-
-### Phase C — Resolve captures
-
-- After placement, captures resolve automatically until stable.
-
-Then turn passes to the other player.
+Each tile is a patch of soil.  
+Each bloom is a living node in a climbing plant colony.
 
 ---
 
-## 5) Tile Influence (who can move what)
+## 3) Board Ecology: How Space Exists in Thigmo
 
-You can move a tile if either is true:
+1. The world is an infinite coordinate field.
+2. Only **8 soil tiles** exist in the match.
+3. No two tiles may occupy the same coordinate.
+4. Blooms occupy vertical positions above each tile: `z = 0, 1, 2...`
+5. If a tile moves, the **entire bloom stack on that tile moves with it**.
+6. A tile can sustain at most **7 blooms** in its stack.
 
-1. Your color exists somewhere in that tile's stack, **or**
-2. Your color exists in at least one 8-neighbor tile around it.
-
-This is recalculated every turn.
-
----
-
-## 6) Groups and Liberties (capture logic)
-
-### Group connection
-
-Pieces are connected only by **orthogonal 3D neighbors**:
-
-- left / right / forward / back (same z), plus
-- directly above / below (same x,y)
-
-Diagonal cells never connect groups.
-
-### Liberty definition
-
-A liberty is an empty orthogonal neighbor cell where a piece could exist.
-
-- Horizontal liberties only count where a tile exists at that `(x, y)`.
-- Space below `z = 0` is never valid.
+Narratively: a soil patch carries all roots anchored in it when displaced.
 
 ---
 
-## 7) Capture Order and Cascades
+## 4) Turn Cycle: Pulse of Growth
 
-During resolution:
+Every turn has three phases, always in this order:
 
-1. Remove all opponent groups with zero liberties.
-2. Then remove your own zero-liberty groups (self-capture is allowed).
-3. Repeat the scan until no additional captures happen.
+### Phase A — Shift One Soil Tile (Required)
 
-Captured enemy pieces increase your capture score.
+You must move exactly one legal tile you influence:
 
----
+- Move it **one step** in any of 8 directions (orthogonal or diagonal).
+- Destination must be empty (no tile already there).
+- After movement, all 8 tiles must still form one connected landmass by **orthogonal tile contact** (no isolated island tiles).
 
-## 8) Win Condition
-
-You win immediately when your capture total reaches **10** after resolution.
+This is tectonic root warfare: you are physically reshaping the contested biome.
 
 ---
 
-## 9) Quick Legality Checklist
+### Phase B — Plant One Bloom (Required unless full)
 
-A move is legal only if all are true:
+After shifting soil, you must place one bloom of your color:
 
-- The selected tile is influenced by the current player.
-- It moves exactly one adjacent step (8-neighborhood).
-- Target coordinate is empty.
-- Result does not isolate any tile from orthogonal tile adjacency.
+- Place onto **any tile**.
+- It lands at the top of that tile’s current stack.
+- You cannot place on a stack already at the **7-bloom maximum**.
 
-A placement is legal only if:
-
-- You are in placement phase, and
-- Target stack has fewer than 7 pieces.
+This is the expansion pulse of your colony.
 
 ---
 
-## 10) Practical Notes
+### Phase C — Resolve Withering (Captures)
 
-- Undo restores the previous full turn snapshot.
-- The visual "liberty assist" / debug aids do not change game rules.
-- The rules above describe current gameplay behavior.
+After planting, captures resolve automatically in waves until stable:
+
+- First, opponent groups with zero liberties are removed.
+- Then, your own zero-liberty groups are removed (self-capture is possible).
+- Repeat until no new removals occur.
+
+All enemy blooms removed in this process add to your capture count.
+
+---
+
+## 5) Tile Influence: What You Are Allowed to Move
+
+A soil tile is movable by you if **either** condition is true:
+
+1. Your bloom appears somewhere in that tile’s stack, **or**
+2. Your bloom appears in at least one neighboring tile in the 8-direction neighborhood.
+
+Theme wording: your colony can only project force through direct tissue presence or nearby touch contact.
+
+---
+
+## 6) Thigmotropic Control (Why Neighbor-Limited Influence Exists)
+
+**Thigmotropic / thigmotropism**: a biological growth response to physical touch or contact cues.  
+(From Greek roots meaning roughly “touch-turning.”)
+
+In Thigmo terms:
+
+- Your colony can only meaningfully manipulate local terrain where it has direct contact pathways.
+- That’s why tile influence is local: **you can only thigmotropically affect your neighbors**.
+
+So this rule isn’t arbitrary—it models plants transmitting pressure and growth behavior through proximity and contact.
+
+---
+
+## 7) Groups and Liberties: Survival Physics of Blooms
+
+### Group Connectivity
+
+Blooms are connected only through **orthogonal 3D adjacency**:
+
+- Left/right/forward/backward on same height (`z`)
+- Directly above/below on same tile (`x, y`)
+
+Diagonal contact never links groups.
+
+---
+
+### Liberty Definition
+
+A **liberty** is an empty orthogonally adjacent cell where growth could exist.
+
+- Horizontal liberty counts only where a tile actually exists at that `(x, y)`.
+- Space below ground (`z < 0`) is invalid.
+
+If a full connected group has **zero liberties**, it cannot survive.
+
+---
+
+## 8) Capture Waves and Cascades
+
+Capture checks are iterative and can chain:
+
+1. Remove opponent zero-liberty groups.
+2. Remove your own zero-liberty groups.
+3. Re-check everything.
+4. Stop only when no group has become newly capturable.
+
+This creates tactical cascades: one placement can trigger a multi-stage collapse of both ecosystems.
+
+---
+
+## 9) Win Condition (Exact)
+
+You win instantly when your total captured enemy blooms reaches **10** after capture resolution.
+
+---
+
+## 10) Legal Move Checklist (Quick Rules Audit)
+
+A tile move is legal only if all are true:
+
+- You influence that tile.
+- It moves exactly one step to an adjacent coordinate (8-way).
+- Destination is unoccupied.
+- Final tile layout remains orthogonally connected.
+
+A bloom placement is legal only if:
+
+- You are in Phase B, and
+- Target stack has fewer than 7 blooms.
+
+---
+
+## 11) Practical Clarifications
+
+- Undo restores the prior full-turn snapshot.
+- Visual helpers (liberty overlays, debug displays) do not alter rules.
+- This rulebook describes current gameplay behavior.
