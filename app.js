@@ -364,7 +364,7 @@ function drawVineConnections(){
 function drawTile(pos, movable, selected){
   const corners = tileCorners(pos.x, pos.y);
   const fill = selected ? '#fef3c7' : movable ? '#dbeafe' : '#f6f0e6';
-  const stroke = selected ? selectedStroke : movable ? '#3b82f6' : '#8b7a63';
+  const stroke = selected ? '#f59e0b' : movable ? '#3b82f6' : '#8b7a63';
 
   ctx.fillStyle = fill;
   ctx.strokeStyle = stroke;
