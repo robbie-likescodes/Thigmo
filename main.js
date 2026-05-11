@@ -351,6 +351,7 @@ function renderLoop(){
   requestAnimationFrame(renderLoop);
 }
 
+window.alert('Welcome to Thigmo! The Botanical Battlefield where rival invasive species compete for sunlight to survive!');
 log('Thigmo loaded.');
 init();
 renderLoop();
