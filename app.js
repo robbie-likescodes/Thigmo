@@ -576,13 +576,6 @@ function draw(){
   ctx.fillStyle = groundGradient;
   ctx.fillRect(0, horizonY, canvas.width, canvas.height - horizonY);
 
-  ctx.strokeStyle = 'rgba(116, 181, 124, 0.75)';
-  ctx.lineWidth = 2;
-  ctx.beginPath();
-  ctx.moveTo(0, horizonY + 0.5);
-  ctx.quadraticCurveTo(canvas.width * 0.5, horizonY - 16, canvas.width, horizonY + 0.5);
-  ctx.stroke();
-
   for (let y = 0; y < canvas.height; y += 3) {
     if (y < horizonY) continue;
     const wave = Math.sin(t * 0.55 + y * 0.03) * 18;
