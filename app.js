@@ -254,6 +254,70 @@ function drawVineConnections(){
   }
 }
 
+function drawTile(pos, movable, selected){
+  const { sx, sy } = worldToScreen(pos.x, pos.y);
+  const size = 62;
+  const r = 10;
+  const x = sx - size / 2;
+  const y = sy - size / 2;
+  const fill = selected ? '#fef3c7' : movable ? '#dbeafe' : '#f6f0e6';
+  const stroke = selected ? '#d97706' : movable ? '#3b82f6' : '#8b7a63';
+
+  ctx.fillStyle = fill;
+  ctx.strokeStyle = stroke;
+  ctx.lineWidth = selected ? 4 : 2;
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.lineTo(x + size - r, y);
+  ctx.quadraticCurveTo(x + size, y, x + size, y + r);
+  ctx.lineTo(x + size, y + size - r);
+  ctx.quadraticCurveTo(x + size, y + size, x + size - r, y + size);
+  ctx.lineTo(x + r, y + size);
+  ctx.quadraticCurveTo(x, y + size, x, y + size - r);
+  ctx.lineTo(x, y + r);
+  ctx.quadraticCurveTo(x, y, x + r, y);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+}
+
+function drawFlower(player, sx, sy, z, topPiece){
+  const py = sy - z * 18;
+  const pal = player === 'purple'
+    ? { petal: '#7c3aed', edge: '#5b21b6', core: '#e9d5ff' }
+    : { petal: '#f59e0b', edge: '#b45309', core: '#fff7d6' };
+  const r = topPiece ? 10 : 8.5;
+
+  ctx.fillStyle = pal.petal;
+  for (let i = 0; i < 6; i++) {
+    const a = (Math.PI * 2 * i) / 6;
+    const px = sx + Math.cos(a) * (r * 0.95);
+    const py2 = py + Math.sin(a) * (r * 0.95);
+    ctx.beginPath();
+    ctx.ellipse(px, py2, r * 0.58, r * 0.42, a, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.strokeStyle = pal.edge;
+  ctx.lineWidth = 1.6;
+  ctx.beginPath();
+  ctx.arc(sx, py, r * 0.95, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.fillStyle = pal.core;
+  ctx.beginPath();
+  ctx.arc(sx, py, r * 0.44, 0, Math.PI * 2);
+  ctx.fill();
+}
+
+function resizeCanvas() {
+  const rect = ui.viewport.getBoundingClientRect();
+  const nextWidth = Math.max(640, Math.round(rect.width));
+  const nextHeight = Math.max(420, Math.round(rect.height));
+  if (canvas.width !== nextWidth || canvas.height !== nextHeight) {
+    canvas.width = nextWidth;
+    canvas.height = nextHeight;
+  }
+}
+
 function draw(){
   ctx.clearRect(0,0,canvas.width,canvas.height);
   ctx.fillStyle = '#bde6af'; ctx.fillRect(0,0,canvas.width,canvas.height);
@@ -278,7 +342,7 @@ function draw(){
     if(stack.length>=6){ ctx.fillStyle='rgba(255,255,255,.85)'; ctx.font='bold 14px Inter'; ctx.fillText(String(stack.length),sx+20,sy-stack.length*18); }
   }
 
-  if (ui.libertyToggle.checked) drawLibertyAssist();
+  if (ui.showLiberties?.checked) drawLibertyAssist();
 }
 
 function drawLibertyAssist(){
@@ -362,11 +426,11 @@ canvas.addEventListener('click', (e)=>{
 });
 
 if (ui.undoBtn) ui.undoBtn.addEventListener('click',()=>{ if(state.undoSnapshot){ restore(state.undoSnapshot); log('Turn undone.'); }});
-if (ui.spacing) ui.spacing.addEventListener('input',()=>{ state.tileSpacing=56+Number(ui.spacing.value)*10; draw(); });
-if (ui.libertyToggle) ui.libertyToggle.addEventListener('change',draw);
+if (ui.showLiberties) ui.showLiberties.addEventListener('change',draw);
 function tick(ts){ state.t=ts; draw(); requestAnimationFrame(tick); }
 
 log('Thigmo botanical battlefield loaded.');
+resizeCanvas();
 init();
 
 window.addEventListener('resize', ()=>{ resizeCanvas(); draw(); });
