@@ -263,6 +263,17 @@ function tileCorners(x, y){
   ];
 }
 
+function tileCorners(x, y){
+  const half = 0.5;
+  return [
+    worldToScreen(x - half, y - half),
+    worldToScreen(x + half, y - half),
+    worldToScreen(x + half, y + half),
+    worldToScreen(x - half, y + half),
+  ];
+}
+
+
 function activeTurnHighlight(){
   return state.turn === 'orange'
     ? { solid: 'rgba(255,159,28,0.85)', ghost: 'rgba(255,159,28,0.45)' }
@@ -324,7 +335,7 @@ function drawVineConnections(){
 function drawTile(pos, movable, selected){
   const corners = tileCorners(pos.x, pos.y);
   const fill = selected ? '#fef3c7' : movable ? '#dbeafe' : '#f6f0e6';
-  const stroke = selected ? '#d97706' : movable ? '#3b82f6' : '#8b7a63';
+  const stroke = selected ? selectedStroke : movable ? '#3b82f6' : '#8b7a63';
 
   ctx.fillStyle = fill;
   ctx.strokeStyle = stroke;
@@ -334,6 +345,32 @@ function drawTile(pos, movable, selected){
   for (let i=1;i<corners.length;i++) ctx.lineTo(corners[i].sx, corners[i].sy);
   ctx.closePath();
   ctx.fill();
+
+  // Dirt-like speckles and soft streaks to give tiles an earthy texture.
+  ctx.save();
+  ctx.clip();
+  for (let i = 0; i < 24; i++) {
+    const nx = x + 6 + ((i * 19) % (size - 12));
+    const ny = y + 6 + ((i * 23 + pos.x * 11 + pos.y * 7) % (size - 12));
+    const speckW = 2 + (i % 3);
+    const speckH = 1.5 + ((i + 1) % 2);
+    ctx.fillStyle = i % 2 === 0 ? 'rgba(78, 52, 28, 0.22)' : 'rgba(188, 151, 102, 0.18)';
+    ctx.beginPath();
+    ctx.ellipse(nx, ny, speckW, speckH, (i % 5) * 0.35, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  ctx.strokeStyle = 'rgba(76, 50, 24, 0.16)';
+  ctx.lineWidth = 1.2;
+  for (let i = 0; i < 4; i++) {
+    const yLine = y + 12 + i * 12 + ((pos.x + pos.y + i) % 3);
+    ctx.beginPath();
+    ctx.moveTo(x + 8, yLine);
+    ctx.quadraticCurveTo(x + size * 0.5, yLine - 4 + i, x + size - 8, yLine + 1);
+    ctx.stroke();
+  }
+  ctx.restore();
+
   ctx.stroke();
 }
 
@@ -377,7 +414,27 @@ function resizeCanvas() {
 function draw(){
   pruneWiltingEffects();
   ctx.clearRect(0,0,canvas.width,canvas.height);
-  ctx.fillStyle = '#bde6af'; ctx.fillRect(0,0,canvas.width,canvas.height);
+
+  // Layered grassy backdrop with subtle sprout texture.
+  const bgGradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
+  bgGradient.addColorStop(0, '#bfe9aa');
+  bgGradient.addColorStop(0.55, '#9fd58c');
+  bgGradient.addColorStop(1, '#84bf74');
+  ctx.fillStyle = bgGradient;
+  ctx.fillRect(0,0,canvas.width,canvas.height);
+
+  for (let i = 0; i < 340; i++) {
+    const x = (i * 73) % canvas.width;
+    const y = ((i * 97) % canvas.height) + 8;
+    const h = 3 + (i % 5);
+    const bend = ((i % 4) - 1.5) * 0.8;
+    ctx.strokeStyle = i % 3 === 0 ? 'rgba(76, 140, 62, 0.28)' : 'rgba(104, 170, 85, 0.22)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(x, y);
+    ctx.quadraticCurveTo(x + bend, y - h * 0.5, x + bend * 1.2, y - h);
+    ctx.stroke();
+  }
   const highlight = activeTurnHighlight();
 
   const selectedMoves = state.selectedTileId ? state.legalMoves.filter(m=>m.tid===state.selectedTileId) : [];
@@ -390,7 +447,8 @@ function draw(){
   }
 
   for(const [tid,pos] of state.tiles){
-    drawTile(pos, state.phase==='selectTile'&&state.legalMoves.some(m=>m.tid===tid), state.hoverTileId===tid || state.selectedTileId===tid);
+    const isSelected = state.selectedTileId===tid || (state.phase==='selectTile' && state.hoverTileId===tid);
+    drawTile(pos, state.phase==='selectTile'&&state.legalMoves.some(m=>m.tid===tid), isSelected, highlight.solid);
   }
   drawVineConnections();
   for(const [tid,pos] of state.tiles){
