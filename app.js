@@ -482,6 +482,40 @@ function ensureCoordinateVisible(x, y){
   fitCameraToBoard();
 }
 
+
+function projectedBoardBounds(){
+  if (state.tiles.size === 0) return null;
+  let minX=Infinity,maxX=-Infinity,minY=Infinity,maxY=-Infinity;
+  for (const {x,y} of state.tiles.values()) {
+    for (const [dx,dy] of [[-0.5,-0.5],[0.5,-0.5],[0.5,0.5],[-0.5,0.5]]) {
+      const c = worldToScreen(x+dx, y+dy);
+      minX = Math.min(minX, c.sx); maxX = Math.max(maxX, c.sx);
+      minY = Math.min(minY, c.sy); maxY = Math.max(maxY, c.sy);
+    }
+  }
+  for (const [kxy, stack] of state.stacks) {
+    const [x,y] = kxy.split(',').map(Number);
+    stack.forEach((_,z)=>{
+      const flower = worldToScreen(x, y, z * 18);
+      minX = Math.min(minX, flower.sx - 12); maxX = Math.max(maxX, flower.sx + 12);
+      minY = Math.min(minY, flower.sy - 12); maxY = Math.max(maxY, flower.sy + 12);
+    });
+  }
+  return { minX, maxX, minY, maxY, width: maxX - minX, height: maxY - minY };
+}
+
+function keepBoardInView(){
+  const bounds = projectedBoardBounds();
+  if (!bounds) return;
+  const marginX = canvas.width * 0.08;
+  const marginY = canvas.height * 0.1;
+  const invalid = !Number.isFinite(bounds.width) || !Number.isFinite(bounds.height) || bounds.width <= 1 || bounds.height <= 1;
+  const outOfFrame = bounds.minX < marginX || bounds.maxX > canvas.width - marginX || bounds.minY < marginY || bounds.maxY > canvas.height - marginY;
+  if (!invalid && !outOfFrame) return;
+  state.camera.userAdjusted = false;
+  fitCameraToBoard();
+}
+
 function tilesByDepth(){
   return [...state.tiles.entries()]
     .map(([tid, pos])=>({ tid, pos }))
@@ -591,6 +625,7 @@ function refresh(){
   const phaseText = state.winner ? `${state.winner.toUpperCase()} WINS` : (state.phase==='selectTile' ? 'Move a tile' : state.phase==='selectDest' ? 'Select destination' : 'Place a piece');
   ui.turnInfo.textContent = `${state.turn[0].toUpperCase()+state.turn.slice(1)} Turn · ${phaseText}`;
   document.getElementById('app-shell').style.setProperty('--edge-glow', state.turn==='purple' ? '#8f66ff88' : '#ffb14f88');
+  keepBoardInView();
   draw();
 }
 
@@ -640,6 +675,7 @@ window.addEventListener('mousemove', (e)=>{
   state.camera.userAdjusted = true;
   state.camera.yaw = state.drag.startYaw + dx * 0.0075;
   state.camera.pitch = Math.max(0.35, Math.min(0.98, state.drag.startPitch + dy * 0.0048));
+  keepBoardInView();
   draw();
 });
 
@@ -652,6 +688,7 @@ canvas.addEventListener('wheel', (e)=>{
   const factor = Math.exp(-e.deltaY * 0.0012);
   state.camera.userAdjusted = true;
   state.camera.zoom = Math.max(0.85, Math.min(2.6, state.camera.zoom * factor));
+  keepBoardInView();
   draw();
 }, { passive: false });
 canvas.addEventListener('click', (e)=>{
