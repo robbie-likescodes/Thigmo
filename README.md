@@ -18,19 +18,6 @@
 - Captured pieces are removed; above pieces collapse.
 - First player to 10 captures wins.
 
-## Debug tools
-- Collapsible Debug Panel:
-  - Show coordinates overlay.
-  - Show liberties for selected stack/group.
-  - Current selected tile + legal destinations.
-  - Influence map for current player.
-  - Rules audit checks:
-    - duplicate tile coordinates
-    - tile count != 8
-    - stack height > 7
-    - floating gaps
-    - isolated tile
-
 ## Known limitations
 - No AI opponent.
 - No save/load persistence.
