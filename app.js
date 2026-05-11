@@ -198,15 +198,22 @@ function worldToScreen(x,y){
   return { sx: centerX + x*state.tileSpacing, sy: centerY + y*state.tileSpacing*0.85 };
 }
 
+function activeTurnHighlight(){
+  return state.turn === 'orange'
+    ? { solid: 'rgba(255,159,28,0.85)', ghost: 'rgba(255,159,28,0.45)' }
+    : { solid: 'rgba(122,60,255,0.85)', ghost: 'rgba(122,60,255,0.45)' };
+}
+
 function draw(){
   ctx.clearRect(0,0,canvas.width,canvas.height);
   ctx.fillStyle = '#bde6af'; ctx.fillRect(0,0,canvas.width,canvas.height);
+  const highlight = activeTurnHighlight();
 
   const selectedMoves = state.selectedTileId ? state.legalMoves.filter(m=>m.tid===state.selectedTileId) : [];
   if (state.phase === 'selectDest') {
     for(const m of selectedMoves){
       const {sx,sy}=worldToScreen(m.to.x,m.to.y);
-      ctx.fillStyle='rgba(199,170,122,0.6)';
+      ctx.fillStyle = highlight.ghost;
       ctx.fillRect(sx-30,sy-30,60,60);
     }
   }
@@ -217,7 +224,9 @@ function draw(){
     ctx.fillRect(sx-34,sy-34,68,68);
 
     if (state.phase === 'selectTile' && state.legalMoves.some(m=>m.tid===tid)) {
-      ctx.strokeStyle = 'rgba(255,255,255,0.75)'; ctx.lineWidth = 3; ctx.strokeRect(sx-36,sy-36,72,72);
+      ctx.strokeStyle = highlight.solid;
+      ctx.lineWidth = 3;
+      ctx.strokeRect(sx-36,sy-36,72,72);
     }
 
     const stack = state.stacks.get(key(pos.x,pos.y)) || [];
