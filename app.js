@@ -1,15 +1,13 @@
-window.THIGMO_BUILD = '2026-05-10-playable-2d';
+window.THIGMO_BUILD = '2026-05-10-botanical-overhaul';
 
 const WIN_CAPTURES = 10;
+const MAX_STACK = 7;
 const ui = {
-  viewport: document.getElementById('viewport'),
-  scorePurple: document.getElementById('score-purple'),
-  scoreOrange: document.getElementById('score-orange'),
-  turnInfo: document.getElementById('turn-info'),
-  libertyToggle: document.getElementById('liberty-toggle'),
-  spacing: document.getElementById('spacing'),
-  undoBtn: document.getElementById('undo-btn'),
-  log: document.getElementById('log'),
+  viewport: document.getElementById('viewport'), scorePurple: document.getElementById('score-purple'), scoreOrange: document.getElementById('score-orange'),
+  turnInfo: document.getElementById('turn-info'), undoBtn: document.getElementById('undo-btn'), log: document.getElementById('log'),
+  phaseBadge: document.getElementById('phase-badge'), feedback: document.getElementById('feedback'), showCoords: document.getElementById('show-coords'),
+  showLiberties: document.getElementById('show-liberties'), debugOutput: document.getElementById('debug-output'), runAudit: document.getElementById('run-audit'),
+  winModal: document.getElementById('win-modal'), winTitle: document.getElementById('win-title')
 };
 
 const state = {
@@ -321,10 +319,12 @@ canvas.addEventListener('click', (e)=>{
   }
 });
 
-ui.undoBtn.addEventListener('click', ()=>{ if(state.undoSnapshot) { restore(state.undoSnapshot); log('Turn undone.'); } });
-ui.spacing.addEventListener('input', ()=>{ state.tileSpacing = 56 + Number(ui.spacing.value)*10; draw(); });
-ui.libertyToggle.addEventListener('change', draw);
-window.addEventListener('resize', ()=>{ draw(); });
+if (ui.undoBtn) ui.undoBtn.addEventListener('click',()=>{ if(state.undoSnapshot){ restore(state.undoSnapshot); log('Turn undone.'); }});
+if (ui.spacing) ui.spacing.addEventListener('input',()=>{ state.tileSpacing=56+Number(ui.spacing.value)*10; draw(); });
+if (ui.libertyToggle) ui.libertyToggle.addEventListener('change',draw);
+function tick(ts){ state.t=ts; draw(); requestAnimationFrame(tick); }
 
-log('Thigmo loaded.');
+log('Thigmo botanical battlefield loaded.');
 init();
+
+window.addEventListener('resize', ()=>{ resizeCanvas(); draw(); });
