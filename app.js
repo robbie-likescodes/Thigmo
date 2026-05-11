@@ -454,7 +454,6 @@ function fitCameraToBoard(){
   const { yaw, pitch } = state.camera;
   const yawCos = Math.cos(yaw), yawSin = Math.sin(yaw);
   const floorTilt = Math.max(0.58, Math.cos(pitch));
-
   let minX=Infinity,maxX=-Infinity,minY=Infinity,maxY=-Infinity;
   for (const [px,py] of points) {
     const localX = (px - cx) * state.tileSpacing;
@@ -464,7 +463,6 @@ function fitCameraToBoard(){
     minX = Math.min(minX, rotX); maxX = Math.max(maxX, rotX);
     minY = Math.min(minY, rotY * floorTilt); maxY = Math.max(maxY, rotY * floorTilt);
   }
-
   const boardW = Math.max(1, maxX - minX);
   const boardH = Math.max(1, maxY - minY);
   const targetW = canvas.width * 0.42;
