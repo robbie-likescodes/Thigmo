@@ -532,7 +532,7 @@ function draw(){
   // Mountain silhouettes sit on the horizon to give the meadow more depth.
   const mountainDrift = Math.sin(t * 0.12) * 8;
   const mountainHeightScale = 4;
-  const mountainWidthScale = 3;
+  const mountainWidthScale = 12;
   const scaleMountainX = (x) => ((x - 0.5) / mountainWidthScale) + 0.5;
   const mountainLayers = [
     {
