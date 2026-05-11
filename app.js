@@ -350,34 +350,23 @@ function drawTile(pos, movable, selected){
   ctx.closePath();
   ctx.fill();
 
-  // Dirt-like speckles and contour streaks to give tiles an earthy texture.
+  // Dirt speckles are generated in tile-space so they stay anchored to tile movement/rotation.
   ctx.save();
   ctx.clip();
-  const minX = Math.min(...corners.map((c)=>c.sx));
-  const maxX = Math.max(...corners.map((c)=>c.sx));
-  const minY = Math.min(...corners.map((c)=>c.sy));
-  const maxY = Math.max(...corners.map((c)=>c.sy));
-  const tileW = maxX - minX;
-  const tileH = maxY - minY;
   for (let i = 0; i < 24; i++) {
-    const nx = minX + 8 + ((i * 19 + pos.x * 11) % Math.max(10, tileW - 16));
-    const ny = minY + 8 + ((i * 23 + pos.y * 13) % Math.max(10, tileH - 16));
-    const speckW = 2 + (i % 3);
-    const speckH = 1.5 + ((i + 1) % 2);
+    const localX = (((i * 19 + pos.x * 11) % 100) / 100 - 0.5) * 0.78;
+    const localY = (((i * 23 + pos.y * 13) % 100) / 100 - 0.5) * 0.78;
+    const center = worldToScreen(pos.x + localX, pos.y + localY);
+    const xAxis = worldToScreen(pos.x + localX + 0.04, pos.y + localY);
+    const yAxis = worldToScreen(pos.x + localX, pos.y + localY + 0.04);
+    const angle = Math.atan2(yAxis.sy - center.sy, yAxis.sx - center.sx);
+    const speckScaleX = Math.max(1.4, Math.hypot(xAxis.sx - center.sx, xAxis.sy - center.sy) * (5 + (i % 3)));
+    const speckScaleY = Math.max(1.1, Math.hypot(yAxis.sx - center.sx, yAxis.sy - center.sy) * (4 + ((i + 1) % 2)));
+
     ctx.fillStyle = i % 2 === 0 ? 'rgba(86, 56, 32, 0.24)' : 'rgba(186, 147, 97, 0.2)';
     ctx.beginPath();
-    ctx.ellipse(nx, ny, speckW, speckH, (i % 5) * 0.35, 0, Math.PI * 2);
+    ctx.ellipse(center.sx, center.sy, speckScaleX * 0.16, speckScaleY * 0.16, angle + (i % 5) * 0.25, 0, Math.PI * 2);
     ctx.fill();
-  }
-
-  ctx.strokeStyle = 'rgba(76, 50, 24, 0.2)';
-  ctx.lineWidth = 1.2;
-  for (let i = 0; i < 4; i++) {
-    const yLine = minY + tileH * (0.2 + i * 0.18) + ((pos.x + pos.y + i) % 3);
-    ctx.beginPath();
-    ctx.moveTo(minX + 10, yLine);
-    ctx.quadraticCurveTo(minX + tileW * 0.5, yLine - 5 + i, maxX - 10, yLine + 1);
-    ctx.stroke();
   }
   ctx.restore();
 
