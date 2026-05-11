@@ -23,7 +23,7 @@ const state = {
   undoSnapshot: null,
   winner: null,
   wiltingEffects: [],
-  camera: { yaw: -0.55, pitch: 0.72, zoom: 1.15 },
+  camera: { yaw: -0.55, pitch: 0.72, zoom: 1.15, userAdjusted: false },
   drag: { active: false, moved: false, startX: 0, startY: 0, startYaw: 0, startPitch: 0 },
 };
 
@@ -50,6 +50,7 @@ function init() {
     state.tiles.set(tid, { x, y });
     state.stacks.set(key(x,y), []);
   }
+  fitCameraToBoard();
   refresh();
 }
 
@@ -420,6 +421,40 @@ function resizeCanvas() {
   }
 }
 
+
+function fitCameraToBoard(){
+  if (state.tiles.size === 0) return;
+  const points = [];
+  for (const {x,y} of state.tiles.values()) {
+    points.push([x-0.5,y-0.5],[x+0.5,y-0.5],[x+0.5,y+0.5],[x-0.5,y+0.5]);
+  }
+
+  const xs = [...state.tiles.values()].map((t)=>t.x);
+  const ys = [...state.tiles.values()].map((t)=>t.y);
+  const cx = (Math.min(...xs) + Math.max(...xs)) * 0.5;
+  const cy = (Math.min(...ys) + Math.max(...ys)) * 0.5;
+
+  const { yaw, pitch } = state.camera;
+  const yawCos = Math.cos(yaw), yawSin = Math.sin(yaw);
+  const floorTilt = Math.max(0.58, Math.cos(pitch));
+
+  let minX=Infinity,maxX=-Infinity,minY=Infinity,maxY=-Infinity;
+  for (const [px,py] of points) {
+    const localX = (px - cx) * state.tileSpacing;
+    const localY = (py - cy) * state.tileSpacing * 0.85;
+    const rotX = localX * yawCos - localY * yawSin;
+    const rotY = localX * yawSin + localY * yawCos;
+    minX = Math.min(minX, rotX); maxX = Math.max(maxX, rotX);
+    minY = Math.min(minY, rotY * floorTilt); maxY = Math.max(maxY, rotY * floorTilt);
+  }
+
+  const boardW = Math.max(1, maxX - minX);
+  const boardH = Math.max(1, maxY - minY);
+  const targetW = canvas.width * 0.42;
+  const targetH = canvas.height * 0.34;
+  state.camera.zoom = Math.max(0.9, Math.min(2.6, Math.min(targetW / boardW, targetH / boardH)));
+}
+
 function draw(){
   pruneWiltingEffects();
   ctx.clearRect(0,0,canvas.width,canvas.height);
@@ -549,6 +584,7 @@ window.addEventListener('mousemove', (e)=>{
   const dx = e.clientX - state.drag.startX;
   const dy = e.clientY - state.drag.startY;
   if (Math.abs(dx) + Math.abs(dy) > 2) state.drag.moved = true;
+  state.camera.userAdjusted = true;
   state.camera.yaw = state.drag.startYaw + dx * 0.0075;
   state.camera.pitch = Math.max(0.35, Math.min(0.98, state.drag.startPitch + dy * 0.0048));
   draw();
@@ -561,6 +597,7 @@ window.addEventListener('mouseup', ()=>{
 canvas.addEventListener('wheel', (e)=>{
   e.preventDefault();
   const factor = Math.exp(-e.deltaY * 0.0012);
+  state.camera.userAdjusted = true;
   state.camera.zoom = Math.max(0.85, Math.min(2.6, state.camera.zoom * factor));
   draw();
 }, { passive: false });
@@ -606,4 +643,4 @@ resizeCanvas();
 init();
 requestAnimationFrame(tick);
 
-window.addEventListener('resize', ()=>{ resizeCanvas(); draw(); });
+window.addEventListener('resize', ()=>{ resizeCanvas(); if (!state.camera.userAdjusted) fitCameraToBoard(); draw(); });
