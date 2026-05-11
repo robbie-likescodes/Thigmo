@@ -23,6 +23,8 @@ const state = {
   undoSnapshot: null,
   winner: null,
   wiltingEffects: [],
+  camera: { yaw: -0.55, pitch: 0.72, zoom: 1.15, userAdjusted: false },
+  drag: { active: false, moved: false, startX: 0, startY: 0, startYaw: 0, startPitch: 0 },
 };
 
 const canvas = document.createElement('canvas');
@@ -48,6 +50,7 @@ function init() {
     state.tiles.set(tid, { x, y });
     state.stacks.set(key(x,y), []);
   }
+  fitCameraToBoard();
   refresh();
 }
 
@@ -222,10 +225,43 @@ function resolveCaptures(active){
   }
 }
 
-function worldToScreen(x,y){
-  const centerX = canvas.width*0.45;
-  const centerY = canvas.height*0.5;
-  return { sx: centerX + x*state.tileSpacing, sy: centerY + y*state.tileSpacing*0.85 };
+function worldToScreen(x, y, height = 0){
+  if (state.tiles.size === 0) {
+    return { sx: canvas.width * 0.5, sy: canvas.height * 0.5, depth: 0, scale: 1 };
+  }
+
+  const xs = [...state.tiles.values()].map((t)=>t.x);
+  const ys = [...state.tiles.values()].map((t)=>t.y);
+  const centerTileX = (Math.min(...xs) + Math.max(...xs)) * 0.5;
+  const centerTileY = (Math.min(...ys) + Math.max(...ys)) * 0.5;
+
+  const localX = (x - centerTileX) * state.tileSpacing;
+  const localY = (y - centerTileY) * state.tileSpacing * 0.85;
+
+  const { yaw, pitch, zoom } = state.camera;
+  const yawCos = Math.cos(yaw), yawSin = Math.sin(yaw);
+  const rotX = localX * yawCos - localY * yawSin;
+  const rotY = localX * yawSin + localY * yawCos;
+
+  const floorTilt = Math.max(0.58, Math.cos(pitch));
+  const heightLift = Math.max(0.62, Math.cos(pitch * 0.72));
+
+  return {
+    sx: canvas.width * 0.5 + rotX * zoom,
+    sy: canvas.height * 0.56 + rotY * zoom * floorTilt - height * zoom * heightLift,
+    depth: rotY,
+    scale: zoom,
+  };
+}
+
+function tileCorners(x, y){
+  const half = 0.5;
+  return [
+    worldToScreen(x - half, y - half),
+    worldToScreen(x + half, y - half),
+    worldToScreen(x + half, y + half),
+    worldToScreen(x - half, y + half),
+  ];
 }
 
 function activeTurnHighlight(){
@@ -248,8 +284,8 @@ function drawVineConnections(){
       drawn.add(pairKey);
       const a = worldToScreen(x,y);
       const b = worldToScreen(nx,ny);
-      const ay = a.sy - 3 - z*18;
-      const by = b.sy - 3 - nz*18;
+      const ay = worldToScreen(x, y, z * 18).sy - 3;
+      const by = worldToScreen(nx, ny, nz * 18).sy - 3;
       const midX = (a.sx + b.sx) * 0.5;
       const midY = (ay + by) * 0.5;
       const curveBend = (x !== nx ? 12 : -12);
@@ -287,11 +323,7 @@ function drawVineConnections(){
 }
 
 function drawTile(pos, movable, selected){
-  const { sx, sy } = worldToScreen(pos.x, pos.y);
-  const size = 62;
-  const r = 10;
-  const x = sx - size / 2;
-  const y = sy - size / 2;
+  const corners = tileCorners(pos.x, pos.y);
   const fill = selected ? '#fef3c7' : movable ? '#dbeafe' : '#f6f0e6';
   const stroke = selected ? '#d97706' : movable ? '#3b82f6' : '#8b7a63';
 
@@ -299,22 +331,15 @@ function drawTile(pos, movable, selected){
   ctx.strokeStyle = stroke;
   ctx.lineWidth = selected ? 4 : 2;
   ctx.beginPath();
-  ctx.moveTo(x + r, y);
-  ctx.lineTo(x + size - r, y);
-  ctx.quadraticCurveTo(x + size, y, x + size, y + r);
-  ctx.lineTo(x + size, y + size - r);
-  ctx.quadraticCurveTo(x + size, y + size, x + size - r, y + size);
-  ctx.lineTo(x + r, y + size);
-  ctx.quadraticCurveTo(x, y + size, x, y + size - r);
-  ctx.lineTo(x, y + r);
-  ctx.quadraticCurveTo(x, y, x + r, y);
+  ctx.moveTo(corners[0].sx, corners[0].sy);
+  for (let i=1;i<corners.length;i++) ctx.lineTo(corners[i].sx, corners[i].sy);
   ctx.closePath();
   ctx.fill();
   ctx.stroke();
 }
 
-function drawFlower(player, sx, sy, z, topPiece){
-  const py = sy - z * 18;
+function drawFlower(player, x, y, z, topPiece){
+  const { sx, sy: pyFinal } = worldToScreen(x, y, z * 18);
   const pal = player === 'purple'
     ? { petal: '#7c3aed', edge: '#5b21b6', core: '#e9d5ff' }
     : { petal: '#f59e0b', edge: '#b45309', core: '#fff7d6' };
@@ -324,7 +349,7 @@ function drawFlower(player, sx, sy, z, topPiece){
   for (let i = 0; i < 6; i++) {
     const a = (Math.PI * 2 * i) / 6;
     const px = sx + Math.cos(a) * (r * 0.95);
-    const py2 = py + Math.sin(a) * (r * 0.95);
+    const py2 = pyFinal + Math.sin(a) * (r * 0.95);
     ctx.beginPath();
     ctx.ellipse(px, py2, r * 0.58, r * 0.42, a, 0, Math.PI * 2);
     ctx.fill();
@@ -332,11 +357,11 @@ function drawFlower(player, sx, sy, z, topPiece){
   ctx.strokeStyle = pal.edge;
   ctx.lineWidth = 1.6;
   ctx.beginPath();
-  ctx.arc(sx, py, r * 0.95, 0, Math.PI * 2);
+  ctx.arc(sx, pyFinal, r * 0.95, 0, Math.PI * 2);
   ctx.stroke();
   ctx.fillStyle = pal.core;
   ctx.beginPath();
-  ctx.arc(sx, py, r * 0.44, 0, Math.PI * 2);
+  ctx.arc(sx, pyFinal, r * 0.44, 0, Math.PI * 2);
   ctx.fill();
 }
 
@@ -350,28 +375,87 @@ function resizeCanvas() {
   }
 }
 
+
+function fitCameraToBoard(){
+  if (state.tiles.size === 0) return;
+  const points = [];
+  for (const {x,y} of state.tiles.values()) {
+    points.push([x-0.5,y-0.5],[x+0.5,y-0.5],[x+0.5,y+0.5],[x-0.5,y+0.5]);
+  }
+
+  const xs = [...state.tiles.values()].map((t)=>t.x);
+  const ys = [...state.tiles.values()].map((t)=>t.y);
+  const cx = (Math.min(...xs) + Math.max(...xs)) * 0.5;
+  const cy = (Math.min(...ys) + Math.max(...ys)) * 0.5;
+
+  const { yaw, pitch } = state.camera;
+  const yawCos = Math.cos(yaw), yawSin = Math.sin(yaw);
+  const floorTilt = Math.max(0.58, Math.cos(pitch));
+
+  let minX=Infinity,maxX=-Infinity,minY=Infinity,maxY=-Infinity;
+  for (const [px,py] of points) {
+    const localX = (px - cx) * state.tileSpacing;
+    const localY = (py - cy) * state.tileSpacing * 0.85;
+    const rotX = localX * yawCos - localY * yawSin;
+    const rotY = localX * yawSin + localY * yawCos;
+    minX = Math.min(minX, rotX); maxX = Math.max(maxX, rotX);
+    minY = Math.min(minY, rotY * floorTilt); maxY = Math.max(maxY, rotY * floorTilt);
+  }
+
+  const boardW = Math.max(1, maxX - minX);
+  const boardH = Math.max(1, maxY - minY);
+  const targetW = canvas.width * 0.42;
+  const targetH = canvas.height * 0.34;
+  state.camera.zoom = Math.max(0.9, Math.min(2.6, Math.min(targetW / boardW, targetH / boardH)));
+}
+
+
+function tilesByDepth(){
+  return [...state.tiles.entries()]
+    .map(([tid, pos])=>({ tid, pos, depth: worldToScreen(pos.x, pos.y).depth }))
+    .sort((a,b)=>a.depth-b.depth);
+}
+
+function drawProjectedSquare(x, y, color){
+  const corners = tileCorners(x, y);
+  ctx.fillStyle = color;
+  ctx.beginPath();
+  ctx.moveTo(corners[0].sx, corners[0].sy);
+  for (let i=1;i<corners.length;i++) ctx.lineTo(corners[i].sx, corners[i].sy);
+  ctx.closePath();
+  ctx.fill();
+}
+
+
+function projectedTileRadius(x, y){
+  const c = worldToScreen(x, y);
+  const corners = tileCorners(x, y);
+  const r = corners.reduce((acc,pt)=>acc + Math.hypot(pt.sx - c.sx, pt.sy - c.sy), 0) / corners.length;
+  return Math.max(22, r * 0.72);
+}
+
 function draw(){
   pruneWiltingEffects();
   ctx.clearRect(0,0,canvas.width,canvas.height);
   ctx.fillStyle = '#bde6af'; ctx.fillRect(0,0,canvas.width,canvas.height);
   const highlight = activeTurnHighlight();
 
+  const orderedTiles = tilesByDepth();
   const selectedMoves = state.selectedTileId ? state.legalMoves.filter(m=>m.tid===state.selectedTileId) : [];
   if (state.phase === 'selectDest') {
-    for(const m of selectedMoves){
-      const {sx,sy}=worldToScreen(m.to.x,m.to.y);
-      ctx.fillStyle = highlight.ghost;
-      ctx.fillRect(sx-30,sy-30,60,60);
-    }
+    for (const m of selectedMoves) drawProjectedSquare(m.to.x, m.to.y, highlight.ghost);
+  }
+  if (state.phase === 'place') {
+    for (const {pos} of orderedTiles) drawProjectedSquare(pos.x, pos.y, 'rgba(95,201,120,0.24)');
   }
 
-  for(const [tid,pos] of state.tiles){
+  for(const {tid,pos} of orderedTiles){
     drawTile(pos, state.phase==='selectTile'&&state.legalMoves.some(m=>m.tid===tid), state.hoverTileId===tid || state.selectedTileId===tid);
   }
   drawVineConnections();
-  for(const [tid,pos] of state.tiles){
+  for(const {pos} of orderedTiles){
     const stack=state.stacks.get(key(pos.x,pos.y))||[]; const {sx,sy}=worldToScreen(pos.x,pos.y);
-    stack.forEach((p,z)=>drawFlower(p,sx,sy-3,z,z===stack.length-1));
+    stack.forEach((p,z)=>drawFlower(p,pos.x,pos.y,z,z===stack.length-1));
     if(stack.length>=6){ ctx.fillStyle='rgba(255,255,255,.85)'; ctx.font='bold 14px Inter'; ctx.fillText(String(stack.length),sx+20,sy-stack.length*18); }
   }
 
@@ -392,7 +476,8 @@ function drawLibertyAssist(){
   for(const l of assists){
     const [x,y,z]=l.split(',').map(Number);
     const {sx,sy}=worldToScreen(x,y);
-    ctx.beginPath(); ctx.arc(sx, sy - z*16, 6, 0, Math.PI*2); ctx.fill();
+    const stackPos = worldToScreen(x, y, z * 16);
+    ctx.beginPath(); ctx.arc(stackPos.sx, stackPos.sy, 6, 0, Math.PI*2); ctx.fill();
   }
 }
 
@@ -407,26 +492,67 @@ function refresh(){
 }
 
 function nearestTile(mx,my){
-  let best=null, bestD=1e9;
+  let best=null, bestScore=1e9;
   for(const [tid,pos] of state.tiles){
-    const {sx,sy}=worldToScreen(pos.x,pos.y);
-    const d = Math.hypot(mx-sx,my-sy);
-    if(d<bestD){bestD=d;best={tid,pos};}
+    const center=worldToScreen(pos.x,pos.y);
+    const d = Math.hypot(mx-center.sx,my-center.sy);
+    const score = d / projectedTileRadius(pos.x, pos.y);
+    if(score<bestScore){bestScore=score;best={tid,pos};}
   }
-  return bestD < 45 ? best : null;
+  return bestScore < 1 ? best : null;
 }
 function nearestGhost(mx,my){
   if(state.phase!=='selectDest'||!state.selectedTileId) return null;
-  let best=null,bestD=1e9;
+  let best=null,bestScore=1e9;
   for(const m of state.legalMoves.filter(m=>m.tid===state.selectedTileId)){
-    const {sx,sy}=worldToScreen(m.to.x,m.to.y);
-    const d=Math.hypot(mx-sx,my-sy); if(d<bestD){bestD=d;best=m;}
+    const c=worldToScreen(m.to.x,m.to.y);
+    const d=Math.hypot(mx-c.sx,my-c.sy);
+    const score = d / projectedTileRadius(m.to.x, m.to.y);
+    if(score<bestScore){bestScore=score;best=m;}
   }
-  return bestD<45 ? best : null;
+  return bestScore<1 ? best : null;
 }
 
+
+
+canvas.addEventListener('mousedown', (e)=>{
+  const rect=canvas.getBoundingClientRect();
+  const mx=(e.clientX-rect.left)*(canvas.width/rect.width);
+  const my=(e.clientY-rect.top)*(canvas.height/rect.height);
+  const canRotate = !nearestTile(mx,my) && !nearestGhost(mx,my);
+  if (!canRotate) return;
+  state.drag.active = true;
+  state.drag.moved = false;
+  state.drag.startX = e.clientX;
+  state.drag.startY = e.clientY;
+  state.drag.startYaw = state.camera.yaw;
+  state.drag.startPitch = state.camera.pitch;
+});
+
+window.addEventListener('mousemove', (e)=>{
+  if (!state.drag.active) return;
+  const dx = e.clientX - state.drag.startX;
+  const dy = e.clientY - state.drag.startY;
+  if (Math.abs(dx) + Math.abs(dy) > 2) state.drag.moved = true;
+  state.camera.userAdjusted = true;
+  state.camera.yaw = state.drag.startYaw + dx * 0.0075;
+  state.camera.pitch = Math.max(0.35, Math.min(0.98, state.drag.startPitch + dy * 0.0048));
+  draw();
+});
+
+window.addEventListener('mouseup', ()=>{
+  state.drag.active = false;
+});
+
+canvas.addEventListener('wheel', (e)=>{
+  e.preventDefault();
+  const factor = Math.exp(-e.deltaY * 0.0012);
+  state.camera.userAdjusted = true;
+  state.camera.zoom = Math.max(0.85, Math.min(2.6, state.camera.zoom * factor));
+  draw();
+}, { passive: false });
 canvas.addEventListener('click', (e)=>{
-  if (state.winner) return;
+  if (state.winner || state.drag.moved) { state.drag.moved = false; return; }
   const rect=canvas.getBoundingClientRect();
   const mx=(e.clientX-rect.left)*(canvas.width/rect.width);
   const my=(e.clientY-rect.top)*(canvas.height/rect.height);
@@ -466,4 +592,4 @@ log('Thigmo botanical battlefield loaded.');
 resizeCanvas();
 init();
 
-window.addEventListener('resize', ()=>{ resizeCanvas(); draw(); });
+window.addEventListener('resize', ()=>{ resizeCanvas(); if (!state.camera.userAdjusted) fitCameraToBoard(); draw(); });
