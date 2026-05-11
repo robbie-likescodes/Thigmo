@@ -12,6 +12,8 @@ const ui = {
   log: document.getElementById('log'),
 };
 
+const WILT_DURATION_MS = 1600;
+
 const state = {
   turn: 'purple',
   phase: 'selectTile',
@@ -24,6 +26,8 @@ const state = {
   tileSpacing: 88,
   undoSnapshot: null,
   winner: null,
+  captureAnims: [],
+  isAnimatingCapture: false,
 };
 
 const canvas = document.createElement('canvas');
@@ -145,7 +149,7 @@ function resolveCaptures(active){
     }
     const remEnemy=[];
     for(const g of groups[other(active)]) if(liberties(g,occ).size===0) remEnemy.push(...g);
-    if(remEnemy.length){ removeCells(remEnemy); state.captures[active]+=remEnemy.length; changed=true; }
+    if(remEnemy.length){ queueWiltAnimations(remEnemy, occ); removeCells(remEnemy); state.captures[active]+=remEnemy.length; changed=true; }
 
     const occ2 = getOccupancy();
     const visited2=new Set();
@@ -155,7 +159,24 @@ function resolveCaptures(active){
       const g=groupFrom(c,occ2); g.forEach(v=>visited2.add(v));
       if(liberties(g,occ2).size===0) remOwn.push(...g);
     }
-    if(remOwn.length){ removeCells(remOwn); changed=true; }
+    if(remOwn.length){ queueWiltAnimations(remOwn, occ2); removeCells(remOwn); changed=true; }
+  }
+}
+
+
+function queueWiltAnimations(cells, occ){
+  const now = performance.now();
+  for (const c of cells){
+    const [x,y,z] = c.split(',').map(Number);
+    const color = occ.get(c);
+    if (!color) continue;
+    state.captureAnims.push({
+      x, y, z, color,
+      start: now,
+      duration: WILT_DURATION_MS,
+      xJitter: (Math.random()-0.5)*8,
+      tiltDir: Math.random() > 0.5 ? 1 : -1,
+    });
   }
 }
 
@@ -196,7 +217,38 @@ function draw(){
     });
   }
 
+  drawCaptureAnimations();
+
   if (ui.libertyToggle.checked) drawLibertyAssist();
+}
+
+
+function drawCaptureAnimations(){
+  const now = performance.now();
+  state.captureAnims = state.captureAnims.filter((anim)=>{
+    const t = Math.min(1, (now - anim.start) / anim.duration);
+    const { sx, sy } = worldToScreen(anim.x, anim.y);
+    const startY = sy - anim.z * 16;
+    const drop = t * t * 40;
+    const wilt = t * 14;
+    const fade = 1 - t;
+
+    ctx.save();
+    ctx.translate(sx + anim.xJitter * t, startY + drop);
+    ctx.rotate(anim.tiltDir * t * 0.65);
+    ctx.scale(1 + t * 0.15, 1 - t * 0.45);
+    ctx.globalAlpha = fade;
+    ctx.fillStyle = anim.color === 'purple' ? '#7a3cff' : '#ff9f1c';
+    ctx.beginPath();
+    ctx.arc(0, wilt, 12, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = anim.color === 'purple' ? '#c9b5ff' : '#ffd19a';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    ctx.restore();
+
+    return t < 1;
+  });
 }
 
 function drawLibertyAssist(){
@@ -247,7 +299,7 @@ function nearestGhost(mx,my){
 }
 
 canvas.addEventListener('click', (e)=>{
-  if (state.winner) return;
+  if (state.winner || state.isAnimatingCapture) return;
   const rect=canvas.getBoundingClientRect();
   const mx=(e.clientX-rect.left)*(canvas.width/rect.width);
   const my=(e.clientY-rect.top)*(canvas.height/rect.height);
@@ -268,10 +320,24 @@ canvas.addEventListener('click', (e)=>{
     const t=nearestTile(mx,my); if(!t) return;
     state.stacks.get(key(t.pos.x,t.pos.y)).push(state.turn);
     resolveCaptures(state.turn);
-    if(state.captures[state.turn] >= WIN_CAPTURES){ state.winner=state.turn; refresh(); return; }
-    state.turn = other(state.turn);
-    if(state.openingRound>0) state.openingRound -= 1;
-    state.phase='selectTile'; state.selectedTileId=null; refresh();
+    const hadCaptureAnimation = state.captureAnims.length > 0;
+    if (hadCaptureAnimation) state.isAnimatingCapture = true;
+
+    const completeTurn = () => {
+      if(state.captures[state.turn] >= WIN_CAPTURES){ state.winner=state.turn; state.isAnimatingCapture=false; refresh(); return; }
+      state.turn = other(state.turn);
+      if(state.openingRound>0) state.openingRound -= 1;
+      state.phase='selectTile';
+      state.selectedTileId=null;
+      state.isAnimatingCapture=false;
+      refresh();
+    };
+
+    if (hadCaptureAnimation) {
+      window.setTimeout(completeTurn, WILT_DURATION_MS);
+    } else {
+      completeTurn();
+    }
   }
 });
 
@@ -280,5 +346,11 @@ ui.spacing.addEventListener('input', ()=>{ state.tileSpacing = 56 + Number(ui.sp
 ui.libertyToggle.addEventListener('change', draw);
 window.addEventListener('resize', ()=>{ draw(); });
 
+function renderLoop(){
+  draw();
+  requestAnimationFrame(renderLoop);
+}
+
 log('Thigmo loaded.');
 init();
+renderLoop();
