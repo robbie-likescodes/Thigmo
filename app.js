@@ -255,6 +255,16 @@ function worldToScreen(x, y, height = 0){
 }
 
 function tileCorners(x, y){
+  const half = 0.43;
+  return [
+    worldToScreen(x - half, y - half),
+    worldToScreen(x + half, y - half),
+    worldToScreen(x + half, y + half),
+    worldToScreen(x - half, y + half),
+  ];
+}
+
+function tileCorners(x, y){
   const half = 0.5;
   return [
     worldToScreen(x - half, y - half),
@@ -372,6 +382,9 @@ function drawTile(pos, movable, selected){
   ctx.restore();
 
   ctx.stroke();
+  ctx.strokeStyle = 'rgba(42,36,28,0.22)';
+  ctx.lineWidth = 1;
+  ctx.stroke();
 }
 
 function drawFlower(player, x, y, z, topPiece){
@@ -448,8 +461,8 @@ function fitCameraToBoard(){
 
 function tilesByDepth(){
   return [...state.tiles.entries()]
-    .map(([tid, pos])=>({ tid, pos, depth: worldToScreen(pos.x, pos.y).depth }))
-    .sort((a,b)=>a.depth-b.depth);
+    .map(([tid, pos])=>({ tid, pos }))
+    .sort((a,b)=> (a.pos.y - b.pos.y) || (a.pos.x - b.pos.x));
 }
 
 function drawProjectedSquare(x, y, color){
@@ -467,7 +480,7 @@ function projectedTileRadius(x, y){
   const c = worldToScreen(x, y);
   const corners = tileCorners(x, y);
   const r = corners.reduce((acc,pt)=>acc + Math.hypot(pt.sx - c.sx, pt.sy - c.sy), 0) / corners.length;
-  return Math.max(22, r * 0.72);
+  return Math.max(20, r * 0.62);
 }
 
 function draw(){
@@ -513,7 +526,7 @@ function draw(){
     for (const m of selectedMoves) drawProjectedSquare(m.to.x, m.to.y, highlight.ghost);
   }
   if (state.phase === 'place') {
-    for (const {pos} of orderedTiles) drawProjectedSquare(pos.x, pos.y, 'rgba(95,201,120,0.24)');
+    for (const {pos} of orderedTiles) drawProjectedSquare(pos.x, pos.y, 'rgba(95,201,120,0.14)');
   }
 
   for(const {tid,pos} of orderedTiles){
