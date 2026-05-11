@@ -40,7 +40,12 @@ const state = {
   hoverPlaceTileId: null,
   touch: { mode: 'none', startX: 0, startY: 0, startYaw: 0, startPitch: 0, moved: false, pinchDist: 0, pinchZoom: 1, suppressClickUntil: 0 },
   mobilePlaceDrag: { active: false, snappedTileId: null },
+  isAnimating: false,
+  captureAnimations: [],
+  fallingAnimations: [],
 };
+const POP_DURATION_MS = 650;
+const FALL_DURATION_MS = 540;
 
 const canvas = document.createElement('canvas');
 canvas.width = 1200;
@@ -216,43 +221,67 @@ function removeCells(cells){
   for(const c of cells){ const [x,y,z]=c.split(',').map(Number); const kxy=key(x,y); if(!map.has(kxy)) map.set(kxy,[]); map.get(kxy).push(z); }
   for(const [kxy,zs] of map){ const s=state.stacks.get(kxy)||[]; state.stacks.set(kxy,s.filter((_,i)=>!zs.includes(i))); }
 }
-function resolveCaptures(active){
+function sleep(ms){ return new Promise((resolve)=>setTimeout(resolve, ms)); }
+function detectCaptureSet(active){
+  const occ = getOccupancy();
+  const visited = new Set();
+  const groups = { purple: [], orange: [] };
+  for(const c of occ.keys()){
+    if(visited.has(c)) continue;
+    const g = groupFrom(c, occ);
+    g.forEach(v=>visited.add(v));
+    groups[occ.get(c)].push(g);
+  }
+  const remEnemy=[]; for(const g of groups[other(active)]) if(liberties(g,occ).size===0) remEnemy.push(...g);
+  const remOwn=[]; for(const g of groups[active]) if(liberties(g,occ).size===0) remOwn.push(...g);
+  return { occ, remEnemy, remOwn };
+}
+function buildFallingAnimations(cells){
+  const falling = [];
+  const byCol = new Map();
+  cells.forEach((c)=>{ const [x,y,z]=c.split(',').map(Number); const k=key(x,y); if(!byCol.has(k)) byCol.set(k,[]); byCol.get(k).push(z); });
+  for (const [kxy, removedZs] of byCol){
+    const [x,y]=kxy.split(',').map(Number);
+    const sorted = [...removedZs].sort((a,b)=>a-b);
+    const oldStack = state.stacks.get(kxy) || [];
+    for (let z=0; z<oldStack.length; z++){
+      const removedBelow = sorted.filter((rz)=>rz < z).length;
+      if (removedBelow > 0 && !sorted.includes(z)) falling.push({ x,y,z,color:oldStack[z], fallBy: removedBelow });
+    }
+  }
+  return falling;
+}
+async function resolveCaptures(active){
   let changed = true;
   while(changed){
     changed = false;
-    const occ = getOccupancy();
-    const visited = new Set();
-    const groups = { purple: [], orange: [] };
-    for(const c of occ.keys()){
-      if(visited.has(c)) continue;
-      const g = groupFrom(c, occ);
-      g.forEach(v=>visited.add(v));
-      groups[occ.get(c)].push(g);
-    }
-    const remEnemy=[];
-    for(const g of groups[other(active)]) if(liberties(g,occ).size===0) remEnemy.push(...g);
-    if(remEnemy.length){
-      addWiltingEffects(remEnemy, occ);
-      removeCells(remEnemy);
+    const { occ, remEnemy, remOwn } = detectCaptureSet(active);
+    const toRemove = [...remEnemy, ...remOwn];
+    if (!toRemove.length) break;
+    changed = true;
+    console.log('capture detected');
+    state.captureAnimations = toRemove.map((c)=>{
+      const [x,y,z]=c.split(',').map(Number);
+      return { id:c, x,y,z, color: occ.get(c), captured:true, popping:true, removeAfterAnimation:true, start: performance.now(), duration: POP_DURATION_MS };
+    });
+    console.log('pop animation started');
+    await sleep(POP_DURATION_MS);
+    console.log('pop animation finished');
+    state.captureAnimations = [];
+    const falling = buildFallingAnimations(toRemove).map((f)=>({ ...f, start: performance.now(), duration: FALL_DURATION_MS }));
+    state.fallingAnimations = falling;
+    addWiltingEffects(toRemove, occ);
+    removeCells(toRemove);
+    console.log('fall animation started');
+    await sleep(FALL_DURATION_MS);
+    state.fallingAnimations = [];
+    console.log('fall animation finished');
+    if (remEnemy.length){
       state.captures[active]+=remEnemy.length;
       log(`${active} captured ${remEnemy.length} ${other(active)} flower${remEnemy.length===1?'':'s'} (group had no liberties).`);
-      changed=true;
     }
-
-    const occ2 = getOccupancy();
-    const visited2=new Set();
-    const remOwn=[];
-    for(const c of occ2.keys()){
-      if(visited2.has(c)||occ2.get(c)!==active) continue;
-      const g=groupFrom(c,occ2); g.forEach(v=>visited2.add(v));
-      if(liberties(g,occ2).size===0) remOwn.push(...g);
-    }
-    if(remOwn.length){
-      addWiltingEffects(remOwn, occ2);
-      removeCells(remOwn);
-      log(`${active} lost ${remOwn.length} flower${remOwn.length===1?'':'s'} to self-capture (no liberties).`);
-      changed=true;
-    }
+    if (remOwn.length) log(`${active} lost ${remOwn.length} flower${remOwn.length===1?'':'s'} to self-capture (no liberties).`);
+    console.log('board resolved');
   }
 }
 
@@ -410,12 +439,38 @@ function drawTile(pos, movable, selected){
 }
 
 function drawFlower(player, x, y, z, topPiece){
-  const { sx, sy: pyFinal } = worldToScreen(x, y, z * FLOWER_VERTICAL_SPACING);
+  const popAnim = state.captureAnimations.find((a)=>a.x===x&&a.y===y&&a.z===z&&a.color===player);
+  const fallAnim = state.fallingAnimations.find((a)=>a.x===x&&a.y===y&&a.z===z&&a.color===player);
+  const now = performance.now();
+  let yOffset = z * FLOWER_VERTICAL_SPACING;
+  if (fallAnim){
+    const p = Math.min(1, (now - fallAnim.start) / fallAnim.duration);
+    const eased = 1 - Math.pow(1 - p, 3);
+    yOffset = (z + fallAnim.fallBy * (1 - eased)) * FLOWER_VERTICAL_SPACING;
+  }
+  const { sx, sy: pyFinal } = worldToScreen(x, y, yOffset);
   const pal = player === 'purple'
     ? { petal: '#7c3aed', edge: '#5b21b6', core: '#e9d5ff' }
     : { petal: '#f59e0b', edge: '#b45309', core: '#fff7d6' };
   const r = topPiece ? 10 : 8.5;
 
+  let scaleX = 1, scaleY = 1, rot = 0, alpha = 1;
+  if (popAnim){
+    const p = Math.min(1, (now - popAnim.start) / popAnim.duration);
+    const balloon = p < 0.6 ? (1 + (p / 0.6) * 0.8) : 1.8;
+    scaleX = balloon * (1 + Math.sin(p * Math.PI * 5) * 0.08);
+    scaleY = balloon * (1 - Math.sin(p * Math.PI * 5) * 0.06);
+    rot = Math.sin(p * Math.PI * 8) * 0.22;
+    alpha = p < 0.72 ? 1 : Math.max(0, 1 - (p - 0.72) / 0.28);
+    ctx.save();
+    ctx.translate(sx, pyFinal);
+    ctx.rotate(rot);
+    ctx.scale(scaleX, scaleY);
+    ctx.translate(-sx, -pyFinal);
+    ctx.globalAlpha = alpha;
+    ctx.shadowBlur = 16 + 18 * p;
+    ctx.shadowColor = player === 'purple' ? 'rgba(178,120,255,0.85)' : 'rgba(255,195,107,0.85)';
+  }
   ctx.fillStyle = pal.petal;
   for (let i = 0; i < 6; i++) {
     const a = (Math.PI * 2 * i) / 6;
@@ -434,6 +489,7 @@ function drawFlower(player, x, y, z, topPiece){
   ctx.beginPath();
   ctx.arc(sx, pyFinal, r * 0.44, 0, Math.PI * 2);
   ctx.fill();
+  if (popAnim) ctx.restore();
 }
 
 function resizeCanvas() {
@@ -758,7 +814,7 @@ function canvasPointFromClient(clientX, clientY){
   };
 }
 function handleBoardClick(mx,my){
-  if (state.winner || state.drag.moved || state.touch.moved) { state.drag.moved = false; state.touch.moved = false; return; }
+  if (state.winner || state.isAnimating || state.drag.moved || state.touch.moved) { state.drag.moved = false; state.touch.moved = false; return; }
   if(state.phase==='selectTile'){
     const t=nearestTile(mx,my); if(!t) return;
     if(!state.legalMoves.some(m=>m.tid===t.tid)) return;
@@ -789,14 +845,16 @@ function handleBoardClick(mx,my){
   }
 }
 
-function placeFlowerOnTile(tileId){
+async function placeFlowerOnTile(tileId){
   const pos = state.tiles.get(tileId);
-  if (!pos || state.phase !== 'place' || state.winner) return;
+  if (!pos || state.phase !== 'place' || state.winner || state.isAnimating) return;
+  state.isAnimating = true;
   state.stacks.get(key(pos.x,pos.y)).push(state.turn);
-  resolveCaptures(state.turn);
-  if(state.captures[state.turn] >= WIN_CAPTURES){ state.winner=state.turn; showWinModal(state.turn); refresh(); return; }
+  await resolveCaptures(state.turn);
+  if(state.captures[state.turn] >= WIN_CAPTURES){ state.winner=state.turn; showWinModal(state.turn); state.isAnimating = false; refresh(); return; }
   state.turn = other(state.turn);
   if(state.openingRound>0) state.openingRound -= 1;
+  state.isAnimating = false;
   state.phase='selectTile'; state.selectedTileId=null; state.hoverPlaceTileId=null; refresh();
 }
 
