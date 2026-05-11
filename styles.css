@@ -22,11 +22,12 @@ body {
 }
 .brand { font-weight:700; font-size:1.15rem; letter-spacing:.01em; }
 .scoreboard { display:flex; gap:8px; }
-.pill { border-radius:999px; padding:5px 11px; background:#fffaf2; border:1px solid #cdc1a9; box-shadow: inset 0 1px #fff; }
-.pill.purple { border-color:#c7b5ff; }
-.pill.orange { border-color:#ffd2a7; }
-.turn-info { font-weight:600; margin-left:auto; margin-right:12px; color:#32472b; }
-.controls-inline { display:flex; gap:10px; align-items:center; font-size:.9rem; }
+.pill { border-radius:999px; padding:4px 9px; background:#fff; border:1px solid #cadac0; }
+.turn-info { margin-left:auto; font-weight:700; }
+.controls-inline { display:flex; gap:8px; align-items:center; }
+.rules-link { border:1px solid #8ba780; background:#fff; border-radius:8px; padding:6px 10px; cursor:pointer; color:inherit; text-decoration:none; }
+.rules-link:hover { background:#f4fff0; }
+button { border:1px solid #8ba780; background:#fff; border-radius:8px; padding:6px 10px; cursor:pointer; }
 #viewport { position:relative; overflow:hidden; }
 .side-panel { background: linear-gradient(180deg, #f8f3e8, #efeadf); border-left:1px solid #b0a88f; padding:12px; overflow:auto; }
 #log { font-size:.85rem; max-height: 40vh; overflow:auto; background:#fffdf8; border:1px solid #d7cfb9; padding:8px; border-radius:8px; }
