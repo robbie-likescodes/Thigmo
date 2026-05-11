@@ -36,7 +36,7 @@ const state = {
   drag: { active: false, moved: false, startX: 0, startY: 0, startYaw: 0, startPitch: 0 },
   hoverTileId: null,
   hoverPlaceTileId: null,
-  touch: { mode: 'none', startX: 0, startY: 0, startYaw: 0, startPitch: 0, moved: false, pinchDist: 0, pinchZoom: 1 },
+  touch: { mode: 'none', startX: 0, startY: 0, startYaw: 0, startPitch: 0, moved: false, pinchDist: 0, pinchZoom: 1, suppressClickUntil: 0 },
 };
 
 const canvas = document.createElement('canvas');
@@ -743,6 +743,7 @@ canvas.addEventListener('wheel', (e)=>{
   draw();
 }, { passive: false });
 canvas.addEventListener('click', (e)=>{
+  if (performance.now() < state.touch.suppressClickUntil) return;
   const { mx, my } = canvasPointFromClient(e.clientX, e.clientY);
   handleBoardClick(mx, my);
 });
@@ -785,6 +786,7 @@ canvas.addEventListener('touchmove', (e)=>{
   }
 }, { passive: true });
 canvas.addEventListener('touchend', (e)=>{
+  state.touch.suppressClickUntil = performance.now() + 700;
   if (state.touch.mode === 'tap' && e.changedTouches.length) {
     const t = e.changedTouches[0];
     const { mx, my } = canvasPointFromClient(t.clientX, t.clientY);
