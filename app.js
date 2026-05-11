@@ -2,6 +2,15 @@ window.THIGMO_BUILD = '2026-05-10-botanical-overhaul';
 
 const WIN_CAPTURES = 10;
 const MAX_STACK = 7;
+const MOVEMENT_RULES = Object.freeze({
+  directions: Object.freeze([
+    [-1,-1], [0,-1], [1,-1],
+    [-1, 0],         [1, 0],
+    [-1, 1], [0, 1], [1, 1],
+  ]),
+  mustLandOnEmptyCoordinate: true,
+  mustRemainOrthogonallyConnected: true,
+});
 const ui = {
   viewport: document.getElementById('viewport'), scorePurple: document.getElementById('score-purple'), scoreOrange: document.getElementById('score-orange'),
   turnInfo: document.getElementById('turn-info'), undoBtn: document.getElementById('undo-btn'), log: document.getElementById('log'),
@@ -38,7 +47,7 @@ const ctx = canvas.getContext('2d');
 
 function key(x,y){ return `${x},${y}`; }
 function other(p){ return p === 'purple' ? 'orange' : 'purple'; }
-function neighbors8(x,y){ const out=[]; for(let dx=-1;dx<=1;dx++) for(let dy=-1;dy<=1;dy++) if(dx||dy) out.push([x+dx,y+dy]); return out; }
+function neighbors8(x,y){ return MOVEMENT_RULES.directions.map(([dx,dy])=>[x+dx,y+dy]); }
 function neighbors6(x,y,z){ return [[x+1,y,z],[x-1,y,z],[x,y+1,z],[x,y-1,z],[x,y,z+1],[x,y,z-1]]; }
 function cellKey(x,y,z){ return `${x},${y},${z}`; }
 function log(msg){ const div = document.createElement('div'); div.textContent = msg; ui.log.prepend(div); }
@@ -81,6 +90,24 @@ function influencedTiles(player){
 }
 
 
+function isAdjacentKingStep(fromX, fromY, toX, toY){
+  return MOVEMENT_RULES.directions.some(([dx,dy]) => fromX + dx === toX && fromY + dy === toY);
+}
+
+function isLegalTileTranslation(tid, toX, toY, player){
+  const from = state.tiles.get(tid);
+  if (!from || !isAdjacentKingStep(from.x, from.y, toX, toY)) return false;
+
+  if (MOVEMENT_RULES.mustLandOnEmptyCoordinate && hasTile(toX, toY)) return false;
+
+  const influenced = influencedTiles(player);
+  if (!influenced.has(tid)) return false;
+
+  if (MOVEMENT_RULES.mustRemainOrthogonallyConnected && !isOrthogonallyConnectedAfterMove(tid, toX, toY)) return false;
+
+  return true;
+}
+
 function isOrthogonallyConnectedAfterMove(tid, toX, toY){
   const occupied = new Map();
   for (const [id, pos] of state.tiles) {
@@ -115,12 +142,10 @@ function isOrthogonallyConnectedAfterMove(tid, toX, toY){
 function legalMovesFor(player){
   const moves=[];
   const influenced = influencedTiles(player);
-  const occ = new Set([...state.tiles.values()].map(t=>key(t.x,t.y)));
   for (const [tid,from] of state.tiles) {
     if (!influenced.has(tid)) continue;
     for (const [nx,ny] of neighbors8(from.x,from.y)) {
-      if (occ.has(key(nx,ny))) continue;
-      if (!isOrthogonallyConnectedAfterMove(tid, nx, ny)) continue;
+      if (!isLegalTileTranslation(tid, nx, ny, player)) continue;
       moves.push({ tid, from:{...from}, to:{x:nx,y:ny} });
     }
   }
@@ -633,8 +658,8 @@ canvas.addEventListener('click', (e)=>{
   }
   if(state.phase==='selectDest'){
     const m=nearestGhost(mx,my); if(!m) return;
-    if (hasTile(m.to.x, m.to.y) || !isOrthogonallyConnectedAfterMove(m.tid, m.to.x, m.to.y)) {
-      log('Illegal move: root network must remain orthogonally connected.');
+    if (!isLegalTileTranslation(m.tid, m.to.x, m.to.y, state.turn)) {
+      log('Illegal move: must be a 1-step influenced move to an empty coordinate that preserves orthogonal connectivity.');
       return;
     }
     state.undoSnapshot = snapshot();
