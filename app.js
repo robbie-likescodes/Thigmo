@@ -731,6 +731,14 @@ canvas.addEventListener('click', (e)=>{
     state.selectedTileId=t.tid; state.phase='selectDest'; state.hoverPlaceTileId=null; ensureCoordinateVisible(t.pos.x, t.pos.y); refresh(); return;
   }
   if(state.phase==='selectDest'){
+    const selectedTile = nearestTile(mx,my);
+    if (selectedTile?.tid === state.selectedTileId) {
+      state.phase = 'selectTile';
+      state.selectedTileId = null;
+      state.hoverPlaceTileId = null;
+      refresh();
+      return;
+    }
     const m=nearestGhost(mx,my); if(!m) return;
     if (!isLegalTileTranslation(m.tid, m.to.x, m.to.y, state.turn)) {
       log('Illegal move: must be a 1-step influenced move to an empty coordinate that preserves orthogonal connectivity.');
