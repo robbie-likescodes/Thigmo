@@ -658,7 +658,7 @@ function draw(){
 
 function winnerAnnouncement(player){
   const side = player[0].toUpperCase() + player.slice(1);
-  return `${side} has prevailed.\nYour colony became the dominant invasive species, aggressively expanding across the root network and thigmotropically overgrowing the opposing bloom. Deprived of sunlight and lateral exposure, the rival colony collapsed under complete ecological suffocation.\nThe canopy now belongs to you.`;
+  return `${side} has prevailed.\nYour colony became the dominant invasive species, aggressively expanding across the root network and thigmotropically overgrowing the opposing bloom. Deprived of sunlight, the rival colony collapsed under complete ecological suffocation.\nThe canopy now belongs to you.`;
 }
 
 function showWinModal(player){

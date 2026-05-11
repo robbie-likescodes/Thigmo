@@ -147,6 +147,7 @@ canvas { display:block; }
   border-radius: 14px;
   box-shadow: 0 20px 44px rgba(0,0,0,0.3);
   padding: 20px 22px;
+  text-align: center;
 }
 
 .win-announcement {
