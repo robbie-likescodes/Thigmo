@@ -462,6 +462,14 @@ function drawProjectedSquare(x, y, color){
   ctx.fill();
 }
 
+
+function projectedTileRadius(x, y){
+  const c = worldToScreen(x, y);
+  const corners = tileCorners(x, y);
+  const r = corners.reduce((acc,pt)=>acc + Math.hypot(pt.sx - c.sx, pt.sy - c.sy), 0) / corners.length;
+  return Math.max(22, r * 0.72);
+}
+
 function draw(){
   pruneWiltingEffects();
   ctx.clearRect(0,0,canvas.width,canvas.height);
@@ -503,6 +511,9 @@ function draw(){
   const selectedMoves = state.selectedTileId ? state.legalMoves.filter(m=>m.tid===state.selectedTileId) : [];
   if (state.phase === 'selectDest') {
     for (const m of selectedMoves) drawProjectedSquare(m.to.x, m.to.y, highlight.ghost);
+  }
+  if (state.phase === 'place') {
+    for (const {pos} of orderedTiles) drawProjectedSquare(pos.x, pos.y, 'rgba(95,201,120,0.24)');
   }
 
   for(const {tid,pos} of orderedTiles){
@@ -548,22 +559,25 @@ function refresh(){
 }
 
 function nearestTile(mx,my){
-  let best=null, bestD=1e9;
+  let best=null, bestScore=1e9;
   for(const [tid,pos] of state.tiles){
-    const {sx,sy}=worldToScreen(pos.x,pos.y);
-    const d = Math.hypot(mx-sx,my-sy);
-    if(d<bestD){bestD=d;best={tid,pos};}
+    const center=worldToScreen(pos.x,pos.y);
+    const d = Math.hypot(mx-center.sx,my-center.sy);
+    const score = d / projectedTileRadius(pos.x, pos.y);
+    if(score<bestScore){bestScore=score;best={tid,pos};}
   }
-  return bestD < 45 ? best : null;
+  return bestScore < 1 ? best : null;
 }
 function nearestGhost(mx,my){
   if(state.phase!=='selectDest'||!state.selectedTileId) return null;
-  let best=null,bestD=1e9;
+  let best=null,bestScore=1e9;
   for(const m of state.legalMoves.filter(m=>m.tid===state.selectedTileId)){
-    const {sx,sy}=worldToScreen(m.to.x,m.to.y);
-    const d=Math.hypot(mx-sx,my-sy); if(d<bestD){bestD=d;best=m;}
+    const c=worldToScreen(m.to.x,m.to.y);
+    const d=Math.hypot(mx-c.sx,my-c.sy);
+    const score = d / projectedTileRadius(m.to.x, m.to.y);
+    if(score<bestScore){bestScore=score;best=m;}
   }
-  return bestD<45 ? best : null;
+  return bestScore<1 ? best : null;
 }
 
 
