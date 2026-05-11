@@ -23,7 +23,7 @@ const state = {
   undoSnapshot: null,
   winner: null,
   wiltingEffects: [],
-  camera: { yaw: -0.55, pitch: 0.8, zoom: 1 },
+  camera: { yaw: -0.55, pitch: 0.72, zoom: 1.15 },
   drag: { active: false, moved: false, startX: 0, startY: 0, startYaw: 0, startPitch: 0 },
 };
 
@@ -242,7 +242,7 @@ function worldToScreen(x, y, height = 0){
   const rotX = localX * yawCos - localY * yawSin;
   const rotY = localX * yawSin + localY * yawCos;
 
-  const floorTilt = Math.cos(pitch);
+  const floorTilt = Math.max(0.58, Math.cos(pitch));
   const heightLift = Math.max(0.45, Math.cos(pitch * 0.72));
 
   return {
@@ -530,7 +530,7 @@ window.addEventListener('mousemove', (e)=>{
   const dy = e.clientY - state.drag.startY;
   if (Math.abs(dx) + Math.abs(dy) > 2) state.drag.moved = true;
   state.camera.yaw = state.drag.startYaw + dx * 0.0075;
-  state.camera.pitch = Math.max(0.3, Math.min(1.35, state.drag.startPitch + dy * 0.0055));
+  state.camera.pitch = Math.max(0.35, Math.min(0.98, state.drag.startPitch + dy * 0.0048));
   draw();
 });
 
@@ -541,7 +541,7 @@ window.addEventListener('mouseup', ()=>{
 canvas.addEventListener('wheel', (e)=>{
   e.preventDefault();
   const factor = Math.exp(-e.deltaY * 0.0012);
-  state.camera.zoom = Math.max(0.55, Math.min(2.6, state.camera.zoom * factor));
+  state.camera.zoom = Math.max(0.85, Math.min(2.6, state.camera.zoom * factor));
   draw();
 }, { passive: false });
 canvas.addEventListener('click', (e)=>{
