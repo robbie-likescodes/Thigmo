@@ -306,13 +306,15 @@ function activeTurnHighlight(){
     : { solid: 'rgba(122,60,255,0.85)', ghost: 'rgba(122,60,255,0.45)' };
 }
 
+const FLOWER_VERTICAL_SPACING = 22;
+
 function drawVineConnections(){
   const tNow = (state.t || performance.now()) * 0.001;
   const occ = getOccupancy();
   const drawn = new Set();
   for (const [cell, color] of occ) {
     const [x,y,z] = cell.split(',').map(Number);
-    const neighbors = [[x+1,y,z],[x,y+1,z]];
+    const neighbors = [[x+1,y,z],[x,y+1,z],[x,y,z+1]];
     for (const [nx,ny,nz] of neighbors) {
       const nKey = cellKey(nx,ny,nz);
       if (occ.get(nKey) !== color) continue;
@@ -321,11 +323,11 @@ function drawVineConnections(){
       drawn.add(pairKey);
       const a = worldToScreen(x,y);
       const b = worldToScreen(nx,ny);
-      const ay = worldToScreen(x, y, z * 18).sy - 3;
-      const by = worldToScreen(nx, ny, nz * 18).sy - 3;
+      const ay = worldToScreen(x, y, z * FLOWER_VERTICAL_SPACING).sy - 3;
+      const by = worldToScreen(nx, ny, nz * FLOWER_VERTICAL_SPACING).sy - 3;
       const midX = (a.sx + b.sx) * 0.5;
       const midY = (ay + by) * 0.5;
-      const baseBend = (x !== nx ? 12 : -12);
+      const baseBend = nz !== z ? -6 : (x !== nx ? 12 : -12);
       const curveBend = baseBend + Math.sin(tNow * 1.3 + x * 0.9 + y * 0.7 + z * 0.5) * 3.8;
       const pal = color === 'purple'
         ? {vine:'#6f4ed9', leaf:'#aa8dff', accent:'#5632b8'}
@@ -402,7 +404,7 @@ function drawTile(pos, movable, selected){
 }
 
 function drawFlower(player, x, y, z, topPiece){
-  const { sx, sy: pyFinal } = worldToScreen(x, y, z * 18);
+  const { sx, sy: pyFinal } = worldToScreen(x, y, z * FLOWER_VERTICAL_SPACING);
   const pal = player === 'purple'
     ? { petal: '#7c3aed', edge: '#5b21b6', core: '#e9d5ff' }
     : { petal: '#f59e0b', edge: '#b45309', core: '#fff7d6' };
@@ -559,7 +561,7 @@ function draw(){
   for(const {pos} of orderedTiles){
     const stack=state.stacks.get(key(pos.x,pos.y))||[]; const {sx,sy}=worldToScreen(pos.x,pos.y);
     stack.forEach((p,z)=>drawFlower(p,pos.x,pos.y,z,z===stack.length-1));
-    if(stack.length>=6){ ctx.fillStyle='rgba(255,255,255,.85)'; ctx.font='bold 14px Inter'; ctx.fillText(String(stack.length),sx+20,sy-stack.length*18); }
+    if(stack.length>=6){ ctx.fillStyle='rgba(255,255,255,.85)'; ctx.font='bold 14px Inter'; ctx.fillText(String(stack.length),sx+20,sy-stack.length*FLOWER_VERTICAL_SPACING); }
   }
 
   if (ui.showLiberties?.checked) drawLibertyAssist();
