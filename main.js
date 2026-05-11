@@ -12,7 +12,8 @@ const ui = {
   log: document.getElementById('log'),
 };
 
-const WILT_DURATION_MS = 1600;
+const WILT_DURATION_MS = 3000;
+const STACK_FALL_DURATION_MS = 700;
 
 const state = {
   turn: 'purple',
@@ -27,6 +28,7 @@ const state = {
   undoSnapshot: null,
   winner: null,
   captureAnims: [],
+  fallAnims: [],
   isAnimatingCapture: false,
 };
 
@@ -132,7 +134,27 @@ function liberties(group, occ){
 function removeCells(cells){
   const map = new Map();
   for(const c of cells){ const [x,y,z]=c.split(',').map(Number); const kxy=key(x,y); if(!map.has(kxy)) map.set(kxy,[]); map.get(kxy).push(z); }
-  for(const [kxy,zs] of map){ const s=state.stacks.get(kxy)||[]; state.stacks.set(kxy,s.filter((_,i)=>!zs.includes(i))); }
+  const now = performance.now();
+  for(const [kxy,zs] of map){
+    const s = state.stacks.get(kxy) || [];
+    const sortedRemoved = [...zs].sort((a,b)=>a-b);
+
+    for (let i = 0; i < s.length; i++){
+      if (sortedRemoved.includes(i)) continue;
+      const fallenBy = sortedRemoved.filter((z)=>z < i).length;
+      if (fallenBy > 0){
+        state.fallAnims.push({
+          kxy,
+          finalZ: i - fallenBy,
+          dropDistance: fallenBy * 16,
+          start: now,
+          duration: STACK_FALL_DURATION_MS,
+        });
+      }
+    }
+
+    state.stacks.set(kxy, s.filter((_,i)=>!sortedRemoved.includes(i)));
+  }
 }
 function resolveCaptures(active){
   let changed = true;
@@ -209,8 +231,10 @@ function draw(){
     }
 
     const stack = state.stacks.get(key(pos.x,pos.y)) || [];
+    const stackKey = key(pos.x, pos.y);
     stack.forEach((p,z)=>{
-      const yOffset = sy - z*16;
+      const fallOffset = getFallOffset(stackKey, z);
+      const yOffset = sy - z*16 - fallOffset;
       ctx.fillStyle = p === 'purple' ? '#7a3cff' : '#ff9f1c';
       ctx.beginPath(); ctx.arc(sx,yOffset,12,0,Math.PI*2); ctx.fill();
       ctx.strokeStyle = p === 'purple' ? '#c9b5ff' : '#ffd19a'; ctx.lineWidth=2; ctx.stroke();
@@ -227,28 +251,62 @@ function drawCaptureAnimations(){
   const now = performance.now();
   state.captureAnims = state.captureAnims.filter((anim)=>{
     const t = Math.min(1, (now - anim.start) / anim.duration);
+    const easeOut = 1 - Math.pow(1 - t, 3);
     const { sx, sy } = worldToScreen(anim.x, anim.y);
     const startY = sy - anim.z * 16;
-    const drop = t * t * 40;
-    const wilt = t * 14;
+    const drop = easeOut * 26;
+    const wilt = easeOut * 10;
     const fade = 1 - t;
+    const dissolveStart = 0.22;
+    const dissolveT = t < dissolveStart ? 0 : (t - dissolveStart) / (1 - dissolveStart);
+    const dissolve = Math.min(1, dissolveT);
+    const radius = 12 * (1 - dissolve * 0.75);
+    const speckCount = 18;
 
     ctx.save();
-    ctx.translate(sx + anim.xJitter * t, startY + drop);
-    ctx.rotate(anim.tiltDir * t * 0.65);
-    ctx.scale(1 + t * 0.15, 1 - t * 0.45);
-    ctx.globalAlpha = fade;
+    ctx.translate(sx + anim.xJitter * easeOut * 1.2, startY + drop);
+    ctx.rotate(anim.tiltDir * easeOut * 0.9);
+    ctx.scale(1 + easeOut * 0.15, 1 - easeOut * 0.4);
+    ctx.globalAlpha = fade * (1 - dissolve * 0.45);
     ctx.fillStyle = anim.color === 'purple' ? '#7a3cff' : '#ff9f1c';
     ctx.beginPath();
-    ctx.arc(0, wilt, 12, 0, Math.PI * 2);
+    ctx.arc(0, wilt, radius, 0, Math.PI * 2);
     ctx.fill();
     ctx.strokeStyle = anim.color === 'purple' ? '#c9b5ff' : '#ffd19a';
     ctx.lineWidth = 2;
     ctx.stroke();
+
+    if (dissolve > 0){
+      for (let i = 0; i < speckCount; i++){
+        const angle = (Math.PI * 2 * i) / speckCount + anim.tiltDir * dissolve * 0.5;
+        const spread = dissolve * 34 + i * 0.4;
+        const px = Math.cos(angle) * spread;
+        const py = wilt + Math.sin(angle) * spread - dissolve * 14;
+        const pr = Math.max(0.6, 2.8 * (1 - dissolve) - i * 0.08);
+        ctx.globalAlpha = fade * dissolve * (0.95 - i * 0.015);
+        ctx.beginPath();
+        ctx.arc(px, py, pr, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
     ctx.restore();
 
     return t < 1;
   });
+}
+
+function getFallOffset(kxy, z){
+  const now = performance.now();
+  let offset = 0;
+  state.fallAnims = state.fallAnims.filter((anim)=>{
+    const t = Math.min(1, (now - anim.start) / anim.duration);
+    if (anim.kxy === kxy && anim.finalZ === z){
+      const eased = 1 - Math.pow(1 - t, 3);
+      offset += (1 - eased) * anim.dropDistance;
+    }
+    return t < 1;
+  });
+  return offset;
 }
 
 function drawLibertyAssist(){
