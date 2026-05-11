@@ -22,6 +22,7 @@ const state = {
   tileSpacing: 88,
   undoSnapshot: null,
   winner: null,
+  wiltingEffects: [],
 };
 
 const canvas = document.createElement('canvas');
@@ -57,6 +58,7 @@ function snapshot(){
     tiles: new Map([...state.tiles].map(([k,v])=>[k,{...v}])),
     stacks: new Map([...state.stacks].map(([k,v])=>[k,[...v]])),
     winner: state.winner,
+    wiltingEffects: state.wiltingEffects.map((effect)=>({ ...effect })),
   };
 }
 
@@ -156,6 +158,25 @@ function liberties(group, occ){
   }
   return libs;
 }
+
+function addWiltingEffects(cells, occ){
+  const start = performance.now();
+  const DURATION_MS = 1800;
+  cells.forEach((c)=>{
+    const [x,y,z]=c.split(',').map(Number);
+    state.wiltingEffects.push({
+      x,y,z,
+      color: occ.get(c),
+      start,
+      duration: DURATION_MS,
+      wobbleSeed: Math.random()*Math.PI*2,
+    });
+  });
+}
+
+function pruneWiltingEffects(now = performance.now()){
+  state.wiltingEffects = state.wiltingEffects.filter((effect)=> now - effect.start < effect.duration);
+}
 function removeCells(cells){
   const map = new Map();
   for(const c of cells){ const [x,y,z]=c.split(',').map(Number); const kxy=key(x,y); if(!map.has(kxy)) map.set(kxy,[]); map.get(kxy).push(z); }
@@ -176,7 +197,13 @@ function resolveCaptures(active){
     }
     const remEnemy=[];
     for(const g of groups[other(active)]) if(liberties(g,occ).size===0) remEnemy.push(...g);
-    if(remEnemy.length){ removeCells(remEnemy); state.captures[active]+=remEnemy.length; changed=true; }
+    if(remEnemy.length){
+      addWiltingEffects(remEnemy, occ);
+      removeCells(remEnemy);
+      state.captures[active]+=remEnemy.length;
+      log(`${active} captured ${remEnemy.length} ${other(active)} flower${remEnemy.length===1?'':'s'} (group had no liberties).`);
+      changed=true;
+    }
 
     const occ2 = getOccupancy();
     const visited2=new Set();
@@ -186,7 +213,12 @@ function resolveCaptures(active){
       const g=groupFrom(c,occ2); g.forEach(v=>visited2.add(v));
       if(liberties(g,occ2).size===0) remOwn.push(...g);
     }
-    if(remOwn.length){ removeCells(remOwn); changed=true; }
+    if(remOwn.length){
+      addWiltingEffects(remOwn, occ2);
+      removeCells(remOwn);
+      log(`${active} lost ${remOwn.length} flower${remOwn.length===1?'':'s'} to self-capture (no liberties).`);
+      changed=true;
+    }
   }
 }
 
@@ -319,6 +351,7 @@ function resizeCanvas() {
 }
 
 function draw(){
+  pruneWiltingEffects();
   ctx.clearRect(0,0,canvas.width,canvas.height);
   ctx.fillStyle = '#bde6af'; ctx.fillRect(0,0,canvas.width,canvas.height);
   const highlight = activeTurnHighlight();
