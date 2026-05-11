@@ -39,8 +39,7 @@ Each bloom is a living node in a climbing plant colony.
 3. No two tiles may occupy the same coordinate.
 4. Blooms occupy vertical positions above each tile: `z = 0, 1, 2...`
 5. If a tile moves, the **entire bloom stack on that tile moves with it**.
-6. A tile can sustain at most **7 blooms** in its stack.
-
+   
 Narratively: a soil patch carries all roots anchored in it when displaced.
 
 ---
