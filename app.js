@@ -532,8 +532,10 @@ function draw(){
   // Mountain silhouettes sit on the horizon to give the meadow more depth.
   const mountainDrift = Math.sin(t * 0.12) * 8;
   const mountainHeightScale = 5.6;
-  // Values below 1 expand the ridge horizontally; 0.75 is 4x wider than the old 3x compression.
-  const mountainWidthScale = 0.75;
+  // Keep mountains visibly above the horizon on wide screens while retaining mobile framing.
+  const mountainVerticalLift = canvas.width >= 900 ? -38 : -24;
+  // Values below 1 expand the ridge horizontally; 0.62 stretches the silhouette wider than before.
+  const mountainWidthScale = 0.62;
   const scaleMountainX = (x) => ((x - 0.5) / mountainWidthScale) + 0.5;
   const mountainLayers = [
     {
@@ -578,10 +580,10 @@ function draw(){
     ctx.beginPath();
     ctx.moveTo(0, canvas.height);
     const first = layer.points[0];
-    ctx.lineTo(scaleMountainX(first[0]) * canvas.width, horizonY + (first[1] + layer.baseOffset + mountainDrift * (0.6 + layerIndex * 0.22)) * mountainHeightScale);
+    ctx.lineTo(scaleMountainX(first[0]) * canvas.width, horizonY + mountainVerticalLift + (first[1] + layer.baseOffset + mountainDrift * (0.6 + layerIndex * 0.22)) * mountainHeightScale);
     for (let i = 1; i < layer.points.length; i++) {
       const [nx, ny] = layer.points[i];
-      ctx.lineTo(scaleMountainX(nx) * canvas.width, horizonY + (ny + layer.baseOffset + mountainDrift * (0.6 + layerIndex * 0.22)) * mountainHeightScale);
+      ctx.lineTo(scaleMountainX(nx) * canvas.width, horizonY + mountainVerticalLift + (ny + layer.baseOffset + mountainDrift * (0.6 + layerIndex * 0.22)) * mountainHeightScale);
     }
     ctx.lineTo(canvas.width, canvas.height);
     ctx.closePath();
