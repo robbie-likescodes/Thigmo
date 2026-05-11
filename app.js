@@ -696,8 +696,24 @@ function refresh(){
   state.legalMoves = legalMovesFor(state.turn);
   ui.scorePurple.textContent = state.captures.purple;
   ui.scoreOrange.textContent = state.captures.orange;
-  const phaseText = state.winner ? `${state.winner.toUpperCase()} WINS` : (state.phase==='selectTile' ? 'Move a tile' : state.phase==='selectDest' ? 'Select destination' : 'Place a piece');
-  ui.turnInfo.textContent = `${state.turn[0].toUpperCase()+state.turn.slice(1)} Turn · ${phaseText}`;
+  const side = state.turn[0].toUpperCase() + state.turn.slice(1);
+  const phaseText = state.winner ? `${state.winner.toUpperCase()} WINS` : (state.phase==='selectTile' ? 'Move a plot of soil' : state.phase==='selectDest' ? 'Pick where it moves' : 'Add a blossom');
+  ui.turnInfo.textContent = `${side} Turn · ${phaseText}`;
+  if (ui.phaseBadge) {
+    ui.phaseBadge.textContent = state.winner ? 'Game Over' : (state.phase === 'place' ? 'Blossom Phase' : 'Move Phase');
+  }
+  if (ui.feedback) {
+    if (state.winner) {
+      const winnerSide = state.winner[0].toUpperCase() + state.winner.slice(1);
+      ui.feedback.textContent = `${winnerSide} wins the match.`;
+    } else if (state.phase === 'selectTile') {
+      ui.feedback.textContent = `${side}'s turn to move a plot of soil.`;
+    } else if (state.phase === 'selectDest') {
+      ui.feedback.textContent = `${side}'s turn to choose where that plot moves.`;
+    } else {
+      ui.feedback.textContent = `${side}'s turn to add a blossom.`;
+    }
+  }
   document.getElementById('app-shell').style.setProperty('--edge-glow', state.turn==='purple' ? '#8f66ff88' : '#ffb14f88');
   syncMobileFlowerDock();
   draw();
