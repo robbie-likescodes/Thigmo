@@ -324,8 +324,8 @@ function drawTile(pos, movable, selected, selectedStroke){
   const r = 10;
   const x = sx - size / 2;
   const y = sy - size / 2;
-  const fill = selected ? '#f4d9a8' : movable ? '#c8a675' : '#9d7445';
-  const stroke = selected ? (selectedStroke || '#8b5a2b') : movable ? '#7f5e34' : '#6d4f2c';
+  const fill = selected ? '#fef3c7' : movable ? '#dbeafe' : '#f6f0e6';
+  const stroke = selected ? selectedStroke : movable ? '#3b82f6' : '#8b7a63';
 
   ctx.fillStyle = fill;
   ctx.strokeStyle = stroke;
@@ -444,9 +444,8 @@ function draw(){
   }
 
   for(const [tid,pos] of state.tiles){
-    const isSelected = state.hoverTileId===tid || state.selectedTileId===tid;
-    const activeStroke = state.turn === 'purple' ? '#7a3cff' : '#f59e0b';
-    drawTile(pos, state.phase==='selectTile'&&state.legalMoves.some(m=>m.tid===tid), isSelected, activeStroke);
+    const isSelected = state.selectedTileId===tid || (state.phase==='selectTile' && state.hoverTileId===tid);
+    drawTile(pos, state.phase==='selectTile'&&state.legalMoves.some(m=>m.tid===tid), isSelected, highlight.solid);
   }
   drawVineConnections();
   for(const [tid,pos] of state.tiles){
