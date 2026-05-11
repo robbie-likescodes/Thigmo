@@ -16,7 +16,8 @@ const ui = {
   turnInfo: document.getElementById('turn-info'), undoBtn: document.getElementById('undo-btn'), log: document.getElementById('log'),
   phaseBadge: document.getElementById('phase-badge'), feedback: document.getElementById('feedback'), showCoords: document.getElementById('show-coords'),
   showLiberties: document.getElementById('show-liberties'), debugOutput: document.getElementById('debug-output'), runAudit: document.getElementById('run-audit'),
-  winModal: document.getElementById('win-modal'), winTitle: document.getElementById('win-title')
+  winModal: document.getElementById('win-modal'), winTitle: document.getElementById('win-title'),
+  winAnnouncement: document.getElementById('win-announcement'), replayBtn: document.getElementById('replay-btn')
 };
 
 const state = {
@@ -586,6 +587,42 @@ function drawLibertyAssist(){
   }
 }
 
+function winnerAnnouncement(player){
+  const side = player[0].toUpperCase() + player.slice(1);
+  return `${side} has prevailed.\nYour colony became the dominant invasive species, aggressively expanding across the root network and thigmotropically overgrowing the opposing bloom. Deprived of sunlight and lateral exposure, the rival colony collapsed under complete ecological suffocation.\nThe canopy now belongs to you.`;
+}
+
+function showWinModal(player){
+  if (!ui.winModal || !ui.winTitle || !ui.winAnnouncement) return;
+  const side = player[0].toUpperCase() + player.slice(1);
+  ui.winTitle.textContent = `${side} has prevailed.`;
+  ui.winAnnouncement.textContent = winnerAnnouncement(player);
+  ui.winModal.classList.remove('hidden');
+}
+
+function hideWinModal(){
+  if (!ui.winModal) return;
+  ui.winModal.classList.add('hidden');
+}
+
+function restartGame(){
+  state.turn = 'purple';
+  state.phase = 'selectTile';
+  state.tiles = new Map();
+  state.stacks = new Map();
+  state.openingRound = 2;
+  state.captures = { purple: 0, orange: 0 };
+  state.selectedTileId = null;
+  state.legalMoves = [];
+  state.undoSnapshot = null;
+  state.winner = null;
+  state.wiltingEffects = [];
+  state.drag = { active: false, moved: false, startX: 0, startY: 0, startYaw: 0, startPitch: 0 };
+  hideWinModal();
+  init();
+  log('Replay started. New colony skirmish begins.');
+}
+
 function refresh(){
   state.legalMoves = legalMovesFor(state.turn);
   ui.scorePurple.textContent = state.captures.purple;
@@ -682,7 +719,7 @@ canvas.addEventListener('click', (e)=>{
     const t=nearestTile(mx,my); if(!t) return;
     state.stacks.get(key(t.pos.x,t.pos.y)).push(state.turn);
     resolveCaptures(state.turn);
-    if(state.captures[state.turn] >= WIN_CAPTURES){ state.winner=state.turn; refresh(); return; }
+    if(state.captures[state.turn] >= WIN_CAPTURES){ state.winner=state.turn; showWinModal(state.turn); refresh(); return; }
     state.turn = other(state.turn);
     if(state.openingRound>0) state.openingRound -= 1;
     state.phase='selectTile'; state.selectedTileId=null; refresh();
@@ -691,6 +728,7 @@ canvas.addEventListener('click', (e)=>{
 
 if (ui.undoBtn) ui.undoBtn.addEventListener('click',()=>{ if(state.undoSnapshot){ restore(state.undoSnapshot); log('Turn undone.'); }});
 if (ui.showLiberties) ui.showLiberties.addEventListener('change',draw);
+if (ui.replayBtn) ui.replayBtn.addEventListener('click', restartGame);
 function tick(ts){ state.t=ts; draw(); requestAnimationFrame(tick); }
 
 log('Thigmo botanical battlefield loaded.');
