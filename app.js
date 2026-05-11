@@ -22,6 +22,7 @@ const state = {
   tileSpacing: 88,
   undoSnapshot: null,
   winner: null,
+  wiltingEffects: [],
 };
 
 const canvas = document.createElement('canvas');
@@ -57,6 +58,7 @@ function snapshot(){
     tiles: new Map([...state.tiles].map(([k,v])=>[k,{...v}])),
     stacks: new Map([...state.stacks].map(([k,v])=>[k,[...v]])),
     winner: state.winner,
+    wiltingEffects: state.wiltingEffects.map((effect)=>({ ...effect })),
   };
 }
 
@@ -156,6 +158,25 @@ function liberties(group, occ){
   }
   return libs;
 }
+
+function addWiltingEffects(cells, occ){
+  const start = performance.now();
+  const DURATION_MS = 1800;
+  cells.forEach((c)=>{
+    const [x,y,z]=c.split(',').map(Number);
+    state.wiltingEffects.push({
+      x,y,z,
+      color: occ.get(c),
+      start,
+      duration: DURATION_MS,
+      wobbleSeed: Math.random()*Math.PI*2,
+    });
+  });
+}
+
+function pruneWiltingEffects(now = performance.now()){
+  state.wiltingEffects = state.wiltingEffects.filter((effect)=> now - effect.start < effect.duration);
+}
 function removeCells(cells){
   const map = new Map();
   for(const c of cells){ const [x,y,z]=c.split(',').map(Number); const kxy=key(x,y); if(!map.has(kxy)) map.set(kxy,[]); map.get(kxy).push(z); }
@@ -176,7 +197,13 @@ function resolveCaptures(active){
     }
     const remEnemy=[];
     for(const g of groups[other(active)]) if(liberties(g,occ).size===0) remEnemy.push(...g);
-    if(remEnemy.length){ removeCells(remEnemy); state.captures[active]+=remEnemy.length; changed=true; }
+    if(remEnemy.length){
+      addWiltingEffects(remEnemy, occ);
+      removeCells(remEnemy);
+      state.captures[active]+=remEnemy.length;
+      log(`${active} captured ${remEnemy.length} ${other(active)} flower${remEnemy.length===1?'':'s'} (group had no liberties).`);
+      changed=true;
+    }
 
     const occ2 = getOccupancy();
     const visited2=new Set();
@@ -186,7 +213,12 @@ function resolveCaptures(active){
       const g=groupFrom(c,occ2); g.forEach(v=>visited2.add(v));
       if(liberties(g,occ2).size===0) remOwn.push(...g);
     }
-    if(remOwn.length){ removeCells(remOwn); changed=true; }
+    if(remOwn.length){
+      addWiltingEffects(remOwn, occ2);
+      removeCells(remOwn);
+      log(`${active} lost ${remOwn.length} flower${remOwn.length===1?'':'s'} to self-capture (no liberties).`);
+      changed=true;
+    }
   }
 }
 
@@ -254,7 +286,50 @@ function drawVineConnections(){
   }
 }
 
+
+function drawWiltingEffects(){
+  const now = performance.now();
+  for (const effect of state.wiltingEffects){
+    const t = Math.min(1, (now - effect.start) / effect.duration);
+    const {sx,sy} = worldToScreen(effect.x,effect.y);
+    const stemBaseY = sy - 3 - effect.z*18;
+    const droop = 4 + t*18;
+    const sway = Math.sin((now*0.006) + effect.wobbleSeed) * (1-t) * 4;
+    const palette = effect.color === 'purple'
+      ? { stem:'#6f4ed9', petal:'#aa8dff', core:'#efe3ff' }
+      : { stem:'#d67a22', petal:'#ffbf73', core:'#fff1dc' };
+
+    ctx.save();
+    ctx.globalAlpha = 0.9 - t*0.8;
+    ctx.strokeStyle = palette.stem;
+    ctx.lineWidth = 3;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(sx, stemBaseY + 10);
+    ctx.quadraticCurveTo(sx + sway*0.5, stemBaseY - 6 + droop*0.25, sx + sway, stemBaseY - 20 + droop);
+    ctx.stroke();
+
+    const bloomX = sx + sway;
+    const bloomY = stemBaseY - 26 + droop;
+    ctx.translate(bloomX, bloomY);
+    ctx.rotate((t*1.15) + sway*0.04);
+    ctx.fillStyle = palette.petal;
+    for (let i=0;i<5;i++){
+      ctx.rotate((Math.PI*2)/5);
+      ctx.beginPath();
+      ctx.ellipse(0, -6 - t*2, 3.3, 7.5 - t*2.5, 0, 0, Math.PI*2);
+      ctx.fill();
+    }
+    ctx.fillStyle = palette.core;
+    ctx.beginPath();
+    ctx.arc(0,0,2.8,0,Math.PI*2);
+    ctx.fill();
+    ctx.restore();
+  }
+}
+
 function draw(){
+  pruneWiltingEffects();
   ctx.clearRect(0,0,canvas.width,canvas.height);
   ctx.fillStyle = '#bde6af'; ctx.fillRect(0,0,canvas.width,canvas.height);
   const highlight = activeTurnHighlight();
@@ -278,6 +353,7 @@ function draw(){
     if(stack.length>=6){ ctx.fillStyle='rgba(255,255,255,.85)'; ctx.font='bold 14px Inter'; ctx.fillText(String(stack.length),sx+20,sy-stack.length*18); }
   }
 
+  drawWiltingEffects();
   if (ui.libertyToggle.checked) drawLibertyAssist();
 }
 
