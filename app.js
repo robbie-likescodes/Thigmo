@@ -484,6 +484,12 @@ function fitCameraToBoard({ includeFlowerHeights = false } = {}){
 }
 
 
+
+function ensureBoardVisible(){
+  state.camera.userAdjusted = false;
+  fitCameraToBoard();
+}
+
 function tilesByDepth(){
   return [...state.tiles.entries()]
     .map(([tid, pos])=>({ tid, pos }))
@@ -665,7 +671,7 @@ canvas.addEventListener('click', (e)=>{
   if(state.phase==='selectTile'){
     const t=nearestTile(mx,my); if(!t) return;
     if(!state.legalMoves.some(m=>m.tid===t.tid)) return;
-    state.selectedTileId=t.tid; state.phase='selectDest'; refresh(); return;
+    state.selectedTileId=t.tid; state.phase='selectDest'; ensureBoardVisible(); refresh(); return;
   }
   if(state.phase==='selectDest'){
     const m=nearestGhost(mx,my); if(!m) return;
