@@ -439,7 +439,7 @@ function resizeCanvas() {
 }
 
 
-function fitCameraToBoard(){
+function fitCameraToBoard({ includeFlowerHeights = false } = {}){
   if (state.tiles.size === 0) return;
   const points = [];
   for (const {x,y} of state.tiles.values()) {
@@ -454,6 +454,12 @@ function fitCameraToBoard(){
   const { yaw, pitch } = state.camera;
   const yawCos = Math.cos(yaw), yawSin = Math.sin(yaw);
   const floorTilt = Math.max(0.58, Math.cos(pitch));
+  const heightLift = Math.max(0.62, Math.cos(pitch * 0.72));
+
+  let maxStackHeight = 0;
+  if (includeFlowerHeights) {
+    for (const stack of state.stacks.values()) maxStackHeight = Math.max(maxStackHeight, stack.length);
+  }
 
   let minX=Infinity,maxX=-Infinity,minY=Infinity,maxY=-Infinity;
   for (const [px,py] of points) {
@@ -465,11 +471,16 @@ function fitCameraToBoard(){
     minY = Math.min(minY, rotY * floorTilt); maxY = Math.max(maxY, rotY * floorTilt);
   }
 
+  if (includeFlowerHeights && maxStackHeight > 0) {
+    const extraFlowerHeight = maxStackHeight * 16 * heightLift + 36;
+    minY -= extraFlowerHeight;
+  }
+
   const boardW = Math.max(1, maxX - minX);
   const boardH = Math.max(1, maxY - minY);
   const targetW = canvas.width * 0.42;
-  const targetH = canvas.height * 0.34;
-  state.camera.zoom = Math.max(0.9, Math.min(2.6, Math.min(targetW / boardW, targetH / boardH)));
+  const targetH = canvas.height * (includeFlowerHeights ? 0.64 : 0.34);
+  state.camera.zoom = Math.max(0.78, Math.min(2.6, Math.min(targetW / boardW, targetH / boardH)));
 }
 
 
@@ -665,9 +676,10 @@ canvas.addEventListener('click', (e)=>{
     state.undoSnapshot = snapshot();
     const p=state.tiles.get(m.tid); const fromK=key(p.x,p.y), toK=key(m.to.x,m.to.y); const stack=state.stacks.get(fromK);
     state.stacks.delete(fromK); state.stacks.set(toK,stack); p.x=m.to.x; p.y=m.to.y;
-    state.phase='place'; log(`${state.turn} moved tile to (${p.x}, ${p.y})`); refresh(); return;
+    state.phase='place'; fitCameraToBoard({ includeFlowerHeights: true }); log(`${state.turn} moved tile to (${p.x}, ${p.y})`); refresh(); return;
   }
   if(state.phase==='place'){
+    fitCameraToBoard({ includeFlowerHeights: true });
     const t=nearestTile(mx,my); if(!t) return;
     state.stacks.get(key(t.pos.x,t.pos.y)).push(state.turn);
     resolveCaptures(state.turn);
