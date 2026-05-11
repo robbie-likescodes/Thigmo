@@ -529,6 +529,42 @@ function draw(){
   ctx.fillStyle = skyGradient;
   ctx.fillRect(0, 0, canvas.width, Math.max(1, horizonY));
 
+  // Mountain silhouettes sit on the horizon to give the meadow more depth.
+  const mountainDrift = Math.sin(t * 0.12) * 8;
+  const mountainLayers = [
+    {
+      color: 'rgba(120, 162, 166, 0.52)',
+      baseOffset: -4,
+      points: [
+        [0.00, 14], [0.08, 2], [0.16, 18], [0.24, -2], [0.32, 14], [0.41, -9],
+        [0.50, 8], [0.60, -3], [0.69, 12], [0.78, -11], [0.88, 10], [1.00, 6],
+      ],
+    },
+    {
+      color: 'rgba(94, 136, 145, 0.44)',
+      baseOffset: 2,
+      points: [
+        [0.00, 16], [0.09, 8], [0.18, 22], [0.30, 4], [0.39, 20], [0.49, 1],
+        [0.57, 15], [0.67, 0], [0.77, 17], [0.86, 3], [0.94, 14], [1.00, 10],
+      ],
+    },
+  ];
+
+  mountainLayers.forEach((layer, layerIndex)=>{
+    ctx.fillStyle = layer.color;
+    ctx.beginPath();
+    ctx.moveTo(0, canvas.height);
+    const first = layer.points[0];
+    ctx.lineTo(first[0] * canvas.width, horizonY + first[1] + layer.baseOffset + mountainDrift * (0.6 + layerIndex * 0.22));
+    for (let i = 1; i < layer.points.length; i++) {
+      const [nx, ny] = layer.points[i];
+      ctx.lineTo(nx * canvas.width, horizonY + ny + layer.baseOffset + mountainDrift * (0.6 + layerIndex * 0.22));
+    }
+    ctx.lineTo(canvas.width, canvas.height);
+    ctx.closePath();
+    ctx.fill();
+  });
+
   // Ground gradient starts at the horizon line and deepens toward foreground.
   const groundGradient = ctx.createLinearGradient(0, horizonY, 0, canvas.height);
   groundGradient.addColorStop(0, '#a7da90');
