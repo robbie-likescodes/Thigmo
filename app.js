@@ -14,8 +14,7 @@ const MOVEMENT_RULES = Object.freeze({
 const ui = {
   viewport: document.getElementById('viewport'), scorePurple: document.getElementById('score-purple'), scoreOrange: document.getElementById('score-orange'),
   turnInfo: document.getElementById('turn-info'), undoBtn: document.getElementById('undo-btn'), log: document.getElementById('log'),
-  phaseBadge: document.getElementById('phase-badge'), feedback: document.getElementById('feedback'), showCoords: document.getElementById('show-coords'),
-  showLiberties: document.getElementById('show-liberties'), debugOutput: document.getElementById('debug-output'), runAudit: document.getElementById('run-audit'),
+  phaseBadge: document.getElementById('phase-badge'), feedback: document.getElementById('feedback'),
   winModal: document.getElementById('win-modal'), winTitle: document.getElementById('win-title'),
   winAnnouncement: document.getElementById('win-announcement'), replayBtn: document.getElementById('replay-btn')
 };
@@ -576,26 +575,6 @@ function draw(){
     if(stack.length>=6){ ctx.fillStyle='rgba(255,255,255,.85)'; ctx.font='bold 14px Inter'; ctx.fillText(String(stack.length),sx+20,sy-stack.length*FLOWER_VERTICAL_SPACING); }
   }
 
-  if (ui.showLiberties?.checked) drawLibertyAssist();
-}
-
-function drawLibertyAssist(){
-  const enemy = other(state.turn);
-  const occ = getOccupancy();
-  const seen = new Set();
-  const assists = new Set();
-  for(const c of occ.keys()){
-    if(seen.has(c) || occ.get(c)!==enemy) continue;
-    const g = groupFrom(c, occ); g.forEach(v=>seen.add(v));
-    liberties(g,occ).forEach(l=>assists.add(l));
-  }
-  ctx.fillStyle='rgba(75,217,107,0.7)';
-  for(const l of assists){
-    const [x,y,z]=l.split(',').map(Number);
-    const {sx,sy}=worldToScreen(x,y);
-    const stackPos = worldToScreen(x, y, z * 16);
-    ctx.beginPath(); ctx.arc(stackPos.sx, stackPos.sy, 6, 0, Math.PI*2); ctx.fill();
-  }
 }
 
 function winnerAnnouncement(player){
@@ -753,7 +732,6 @@ canvas.addEventListener('click', (e)=>{
 });
 
 if (ui.undoBtn) ui.undoBtn.addEventListener('click',()=>{ if(state.undoSnapshot){ restore(state.undoSnapshot); log('Turn undone.'); }});
-if (ui.showLiberties) ui.showLiberties.addEventListener('change',draw);
 if (ui.replayBtn) ui.replayBtn.addEventListener('click', restartGame);
 function tick(ts){ state.t=ts; draw(); requestAnimationFrame(tick); }
 
