@@ -264,6 +264,17 @@ function tileCorners(x, y){
   ];
 }
 
+function tileCorners(x, y){
+  const half = 0.5;
+  return [
+    worldToScreen(x - half, y - half),
+    worldToScreen(x + half, y - half),
+    worldToScreen(x + half, y + half),
+    worldToScreen(x - half, y + half),
+  ];
+}
+
+
 function activeTurnHighlight(){
   return state.turn === 'orange'
     ? { solid: 'rgba(255,159,28,0.85)', ghost: 'rgba(255,159,28,0.45)' }
@@ -271,6 +282,7 @@ function activeTurnHighlight(){
 }
 
 function drawVineConnections(){
+  const tNow = (state.t || performance.now()) * 0.001;
   const occ = getOccupancy();
   const drawn = new Set();
   for (const [cell, color] of occ) {
@@ -288,7 +300,8 @@ function drawVineConnections(){
       const by = worldToScreen(nx, ny, nz * 18).sy - 3;
       const midX = (a.sx + b.sx) * 0.5;
       const midY = (ay + by) * 0.5;
-      const curveBend = (x !== nx ? 12 : -12);
+      const baseBend = (x !== nx ? 12 : -12);
+      const curveBend = baseBend + Math.sin(tNow * 1.3 + x * 0.9 + y * 0.7 + z * 0.5) * 3.8;
       const pal = color === 'purple'
         ? {vine:'#6f4ed9', leaf:'#aa8dff', accent:'#5632b8'}
         : {vine:'#d67a22', leaf:'#ffbf73', accent:'#b65f12'};
@@ -307,15 +320,16 @@ function drawVineConnections(){
         const lx = (1-t)*(1-t)*a.sx + 2*(1-t)*t*(midX + curveBend) + t*t*b.sx;
         const ly = (1-t)*(1-t)*ay + 2*(1-t)*t*(midY - curveBend*0.35) + t*t*by;
         const dir = i%2===0 ? 1 : -1;
+        const leafWiggle = Math.sin(tNow * 2 + i * 0.8 + x * 0.5 + y * 0.6) * 2.2;
         ctx.fillStyle = pal.leaf;
         ctx.beginPath();
-        ctx.ellipse(lx + dir*6, ly - dir*3, 5.2, 2.8, dir*0.8, 0, Math.PI*2);
+        ctx.ellipse(lx + dir*(6 + leafWiggle * 0.4), ly - dir*3 + leafWiggle, 5.2, 2.8, dir*0.8 + leafWiggle*0.06, 0, Math.PI*2);
         ctx.fill();
         ctx.strokeStyle = pal.accent;
         ctx.lineWidth = 1.2;
         ctx.beginPath();
         ctx.moveTo(lx, ly);
-        ctx.lineTo(lx + dir*6, ly - dir*3);
+        ctx.lineTo(lx + dir*(6 + leafWiggle * 0.4), ly - dir*3 + leafWiggle);
         ctx.stroke();
       }
     }
@@ -325,7 +339,7 @@ function drawVineConnections(){
 function drawTile(pos, movable, selected){
   const corners = tileCorners(pos.x, pos.y);
   const fill = selected ? '#fef3c7' : movable ? '#dbeafe' : '#f6f0e6';
-  const stroke = selected ? '#d97706' : movable ? '#3b82f6' : '#8b7a63';
+  const stroke = selected ? selectedStroke : movable ? '#3b82f6' : '#8b7a63';
 
   ctx.fillStyle = fill;
   ctx.strokeStyle = stroke;
@@ -335,6 +349,38 @@ function drawTile(pos, movable, selected){
   for (let i=1;i<corners.length;i++) ctx.lineTo(corners[i].sx, corners[i].sy);
   ctx.closePath();
   ctx.fill();
+
+  // Dirt-like speckles and contour streaks to give tiles an earthy texture.
+  ctx.save();
+  ctx.clip();
+  const minX = Math.min(...corners.map((c)=>c.sx));
+  const maxX = Math.max(...corners.map((c)=>c.sx));
+  const minY = Math.min(...corners.map((c)=>c.sy));
+  const maxY = Math.max(...corners.map((c)=>c.sy));
+  const tileW = maxX - minX;
+  const tileH = maxY - minY;
+  for (let i = 0; i < 24; i++) {
+    const nx = minX + 8 + ((i * 19 + pos.x * 11) % Math.max(10, tileW - 16));
+    const ny = minY + 8 + ((i * 23 + pos.y * 13) % Math.max(10, tileH - 16));
+    const speckW = 2 + (i % 3);
+    const speckH = 1.5 + ((i + 1) % 2);
+    ctx.fillStyle = i % 2 === 0 ? 'rgba(86, 56, 32, 0.24)' : 'rgba(186, 147, 97, 0.2)';
+    ctx.beginPath();
+    ctx.ellipse(nx, ny, speckW, speckH, (i % 5) * 0.35, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  ctx.strokeStyle = 'rgba(76, 50, 24, 0.2)';
+  ctx.lineWidth = 1.2;
+  for (let i = 0; i < 4; i++) {
+    const yLine = minY + tileH * (0.2 + i * 0.18) + ((pos.x + pos.y + i) % 3);
+    ctx.beginPath();
+    ctx.moveTo(minX + 10, yLine);
+    ctx.quadraticCurveTo(minX + tileW * 0.5, yLine - 5 + i, maxX - 10, yLine + 1);
+    ctx.stroke();
+  }
+  ctx.restore();
+
   ctx.stroke();
   ctx.strokeStyle = 'rgba(42,36,28,0.22)';
   ctx.lineWidth = 1;
@@ -440,7 +486,38 @@ function projectedTileRadius(x, y){
 function draw(){
   pruneWiltingEffects();
   ctx.clearRect(0,0,canvas.width,canvas.height);
-  ctx.fillStyle = '#bde6af'; ctx.fillRect(0,0,canvas.width,canvas.height);
+  const t = (state.t || performance.now()) * 0.001;
+
+  // Layered grassy backdrop with subtle texture.
+  const bgGradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
+  bgGradient.addColorStop(0, '#bfe9aa');
+  bgGradient.addColorStop(0.55, '#9fd58c');
+  bgGradient.addColorStop(1, '#84bf74');
+  ctx.fillStyle = bgGradient;
+  ctx.fillRect(0,0,canvas.width,canvas.height);
+
+  for (let y = 0; y < canvas.height; y += 3) {
+    const wave = Math.sin(t * 0.55 + y * 0.03) * 18;
+    ctx.strokeStyle = `rgba(162, 214, 138, ${0.06 + ((y / canvas.height) * 0.05)})`;
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(0, y);
+    ctx.lineTo(canvas.width, y + wave * 0.1);
+    ctx.stroke();
+  }
+
+  for (let i = 0; i < 340; i++) {
+    const x = (i * 73) % canvas.width;
+    const y = ((i * 97) % canvas.height) + 8;
+    const h = 3 + (i % 5);
+    const bend = ((i % 4) - 1.5) * 0.8 + Math.sin(t * 1.2 + i * 0.14) * 1.6;
+    ctx.strokeStyle = i % 3 === 0 ? 'rgba(76, 140, 62, 0.28)' : 'rgba(104, 170, 85, 0.22)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(x, y);
+    ctx.quadraticCurveTo(x + bend, y - h * 0.5, x + bend * 1.2, y - h);
+    ctx.stroke();
+  }
   const highlight = activeTurnHighlight();
 
   const orderedTiles = tilesByDepth();
@@ -594,5 +671,6 @@ function tick(ts){ state.t=ts; draw(); requestAnimationFrame(tick); }
 log('Thigmo botanical battlefield loaded.');
 resizeCanvas();
 init();
+requestAnimationFrame(tick);
 
 window.addEventListener('resize', ()=>{ resizeCanvas(); if (!state.camera.userAdjusted) fitCameraToBoard(); draw(); });
