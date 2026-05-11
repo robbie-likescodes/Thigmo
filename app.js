@@ -23,8 +23,8 @@ const state = {
   undoSnapshot: null,
   winner: null,
   wiltingEffects: [],
-  camera: { yaw: -0.55, zoom: 1 },
-  drag: { active: false, moved: false, startX: 0, startY: 0, startYaw: 0 },
+  camera: { yaw: -0.55, pitch: 0.8, zoom: 1 },
+  drag: { active: false, moved: false, startX: 0, startY: 0, startYaw: 0, startPitch: 0 },
 };
 
 const canvas = document.createElement('canvas');
@@ -235,19 +235,38 @@ function worldToScreen(x, y, height = 0){
   const centerTileY = (Math.min(...ys) + Math.max(...ys)) * 0.5;
 
   const localX = (x - centerTileX) * state.tileSpacing;
-  const localY = (y - centerTileY) * state.tileSpacing * 0.85;
+  const localZ = (y - centerTileY) * state.tileSpacing * 0.85;
+  const localY = height;
 
-  const { yaw, zoom } = state.camera;
-  const cosA = Math.cos(yaw), sinA = Math.sin(yaw);
-  const rotX = localX * cosA - localY * sinA;
-  const rotY = localX * sinA + localY * cosA;
+  const { yaw, pitch, zoom } = state.camera;
+  const yawCos = Math.cos(yaw), yawSin = Math.sin(yaw);
+  const x1 = localX * yawCos - localZ * yawSin;
+  const z1 = localX * yawSin + localZ * yawCos;
+
+  const pitchCos = Math.cos(pitch), pitchSin = Math.sin(pitch);
+  const y2 = localY * pitchCos - z1 * pitchSin;
+  const z2 = localY * pitchSin + z1 * pitchCos;
+
+  const focal = 760;
+  const perspective = focal / Math.max(220, focal + z2);
+  const scale = zoom * perspective;
 
   return {
-    sx: canvas.width * 0.5 + rotX * zoom,
-    sy: canvas.height * 0.56 + rotY * zoom - height,
-    depth: 0,
-    scale: zoom,
+    sx: canvas.width * 0.5 + x1 * scale,
+    sy: canvas.height * 0.56 - y2 * scale,
+    depth: z2,
+    scale,
   };
+}
+
+function tileCorners(x, y){
+  const half = 0.5;
+  return [
+    worldToScreen(x - half, y - half),
+    worldToScreen(x + half, y - half),
+    worldToScreen(x + half, y + half),
+    worldToScreen(x - half, y + half),
+  ];
 }
 
 function activeTurnHighlight(){
@@ -309,11 +328,7 @@ function drawVineConnections(){
 }
 
 function drawTile(pos, movable, selected){
-  const { sx, sy } = worldToScreen(pos.x, pos.y);
-  const size = 62;
-  const r = 10;
-  const x = sx - size / 2;
-  const y = sy - size / 2;
+  const corners = tileCorners(pos.x, pos.y);
   const fill = selected ? '#fef3c7' : movable ? '#dbeafe' : '#f6f0e6';
   const stroke = selected ? '#d97706' : movable ? '#3b82f6' : '#8b7a63';
 
@@ -321,15 +336,8 @@ function drawTile(pos, movable, selected){
   ctx.strokeStyle = stroke;
   ctx.lineWidth = selected ? 4 : 2;
   ctx.beginPath();
-  ctx.moveTo(x + r, y);
-  ctx.lineTo(x + size - r, y);
-  ctx.quadraticCurveTo(x + size, y, x + size, y + r);
-  ctx.lineTo(x + size, y + size - r);
-  ctx.quadraticCurveTo(x + size, y + size, x + size - r, y + size);
-  ctx.lineTo(x + r, y + size);
-  ctx.quadraticCurveTo(x, y + size, x, y + size - r);
-  ctx.lineTo(x, y + r);
-  ctx.quadraticCurveTo(x, y, x + r, y);
+  ctx.moveTo(corners[0].sx, corners[0].sy);
+  for (let i=1;i<corners.length;i++) ctx.lineTo(corners[i].sx, corners[i].sy);
   ctx.closePath();
   ctx.fill();
   ctx.stroke();
@@ -461,6 +469,7 @@ canvas.addEventListener('mousedown', (e)=>{
   state.drag.startX = e.clientX;
   state.drag.startY = e.clientY;
   state.drag.startYaw = state.camera.yaw;
+  state.drag.startPitch = state.camera.pitch;
 });
 
 window.addEventListener('mousemove', (e)=>{
@@ -469,6 +478,7 @@ window.addEventListener('mousemove', (e)=>{
   const dy = e.clientY - state.drag.startY;
   if (Math.abs(dx) + Math.abs(dy) > 2) state.drag.moved = true;
   state.camera.yaw = state.drag.startYaw + dx * 0.0075;
+  state.camera.pitch = Math.max(0.3, Math.min(1.35, state.drag.startPitch + dy * 0.0055));
   draw();
 });
 
