@@ -626,8 +626,8 @@ function drawOpponentCanopyGaps(){
   if (lifeTier <= 0) return;
 
   const pulse = 0.72 + Math.sin((state.t || performance.now()) * 0.006) * 0.16;
-  const glowRadius = (6.2 + pulse * 2.2) * 1.3;
-  const coreRadius = (2.4 + pulse * 0.7) * 1.3;
+  const glowRadius = 6.2 + pulse * 2.2;
+  const coreRadius = 2.4 + pulse * 0.7;
 
   for (const [, pos] of state.tiles) {
     const stackHeight = (state.stacks.get(key(pos.x, pos.y)) || []).length;
