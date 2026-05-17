@@ -20,6 +20,7 @@ const ui = {
   mobileFlowerDock: document.getElementById('mobile-flower-dock'),
   mobileFlowerIcon: document.getElementById('mobile-flower-icon'),
   showNeutralsToggle: document.getElementById('show-neutrals-toggle'),
+  showOpponentCanopyGapsToggle: document.getElementById('show-opponent-canopy-gaps-toggle'),
 };
 
 const state = {
@@ -611,6 +612,45 @@ function drawNeutralAssist(){
   }
 }
 
+function drawOpponentCanopyGaps(){
+  const opponent = other(state.turn);
+  let tallestOpponentStack = 0;
+  for (const stack of state.stacks.values()) {
+    if (!stack.includes(opponent)) continue;
+    tallestOpponentStack = Math.max(tallestOpponentStack, stack.length);
+  }
+  const lifeTier = tallestOpponentStack + 1;
+  if (lifeTier <= 0) return;
+
+  const pulse = 0.72 + Math.sin((state.t || performance.now()) * 0.006) * 0.16;
+  const glowRadius = 6.2 + pulse * 2.2;
+  const coreRadius = 2.4 + pulse * 0.7;
+
+  for (const [, pos] of state.tiles) {
+    const stack = state.stacks.get(key(pos.x, pos.y)) || [];
+    if (!stack.includes(opponent)) continue;
+    const stackHeight = stack.length;
+    for (let z = stackHeight; z < lifeTier; z++) {
+      const { sx, sy } = worldToScreen(pos.x, pos.y, z * FLOWER_VERTICAL_SPACING);
+      ctx.beginPath();
+      ctx.fillStyle = `rgba(255, 208, 77, ${0.2 + pulse * 0.28})`;
+      ctx.arc(sx, sy, glowRadius, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.fillStyle = `rgba(255, 240, 164, ${0.82 + pulse * 0.12})`;
+      ctx.arc(sx, sy, coreRadius, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+}
+
+function syncNeutralToggles(){
+  if (!ui.showNeutralsToggle || !ui.showOpponentCanopyGapsToggle) return;
+  const enabled = ui.showNeutralsToggle.checked;
+  ui.showOpponentCanopyGapsToggle.disabled = !enabled;
+  if (!enabled) ui.showOpponentCanopyGapsToggle.checked = false;
+}
+
 function draw(){
   pruneWiltingEffects();
   ctx.clearRect(0,0,canvas.width,canvas.height);
@@ -736,6 +776,7 @@ function draw(){
     drawTile(pos, state.phase==='selectTile'&&state.legalMoves.some(m=>m.tid===tid), state.hoverTileId===tid || state.selectedTileId===tid);
   }
   if (ui.showNeutralsToggle?.checked) drawNeutralAssist();
+  if (ui.showNeutralsToggle?.checked && ui.showOpponentCanopyGapsToggle?.checked) drawOpponentCanopyGaps();
   drawVineConnections();
   for(const {pos} of orderedTiles){
     const stack=state.stacks.get(key(pos.x,pos.y))||[]; const {sx,sy}=worldToScreen(pos.x,pos.y);
@@ -1052,7 +1093,9 @@ function tick(ts){ state.t=ts; draw(); requestAnimationFrame(tick); }
 log('Thigmo botanical battlefield loaded.');
 resizeCanvas();
 init();
+syncNeutralToggles();
 requestAnimationFrame(tick);
 
 window.addEventListener('resize', ()=>{ resizeCanvas(); if (!state.camera.userAdjusted) fitCameraToBoard(); draw(); });
-if (ui.showNeutralsToggle) ui.showNeutralsToggle.addEventListener('change', ()=>draw());
+if (ui.showNeutralsToggle) ui.showNeutralsToggle.addEventListener('change', ()=>{ syncNeutralToggles(); draw(); });
+if (ui.showOpponentCanopyGapsToggle) ui.showOpponentCanopyGapsToggle.addEventListener('change', ()=>draw());

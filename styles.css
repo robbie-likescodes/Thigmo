@@ -96,6 +96,11 @@ label { display:flex; align-items:center; gap:6px; }
   width: 16px;
   height: 16px;
 }
+.toggle-subrow {
+  margin-top: 6px;
+  margin-left: 18px;
+  font-weight: 500;
+}
 canvas { display:block; }
 .mobile-flower-dock {
   position: absolute;
