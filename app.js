@@ -21,6 +21,7 @@ const ui = {
   mobileFlowerIcon: document.getElementById('mobile-flower-icon'),
   showNeutralsToggle: document.getElementById('show-neutrals-toggle'),
   showOpponentCanopyGapsToggle: document.getElementById('show-opponent-canopy-gaps-toggle'),
+  showOpponentVulnerabilitiesToggle: document.getElementById('show-opponent-vulnerabilities-toggle'),
 };
 
 const state = {
@@ -589,40 +590,6 @@ function projectedTileRadius(x, y){
   return Math.max(20, r * 0.62);
 }
 
-
-function playableNeutralNodes(){
-  const nodes = [];
-  for (const [, pos] of state.tiles) {
-    const stackHeight = (state.stacks.get(key(pos.x, pos.y)) || []).length;
-    nodes.push({ x: pos.x, y: pos.y, z: stackHeight });
-  }
-  return nodes;
-}
-
-function nearestPlayableNeutral(mx, my){
-  if (state.phase !== 'place') return null;
-  let best = null;
-  let bestScore = 1e9;
-  for (const node of playableNeutralNodes()) {
-    const c = worldToScreen(node.x, node.y, node.z * FLOWER_VERTICAL_SPACING);
-    const d = Math.hypot(mx - c.sx, my - c.sy);
-    const score = d / Math.max(12, projectedTileRadius(node.x, node.y) * 0.42);
-    if (score < bestScore) {
-      bestScore = score;
-      best = node;
-    }
-  }
-  return bestScore < 1 ? best : null;
-}
-
-
-function tileIdAtCoordinate(x, y){
-  for (const [tid, pos] of state.tiles) {
-    if (pos.x === x && pos.y === y) return tid;
-  }
-  return null;
-}
-
 function drawNeutralAssist(){
   let tallestStack = 0;
   for (const stack of state.stacks.values()) tallestStack = Math.max(tallestStack, stack.length);
@@ -690,11 +657,43 @@ function drawOpponentCanopyGaps(){
   }
 }
 
+function drawOpponentVulnerabilities(){
+  const opponent = other(state.turn);
+  const occ = getOccupancy();
+  const seen = new Set();
+  const killPoints = new Set();
+  for (const cell of occ.keys()) {
+    if (seen.has(cell) || occ.get(cell) !== opponent) continue;
+    const group = groupFrom(cell, occ);
+    group.forEach((c)=>seen.add(c));
+    const libs = [...liberties(group, occ)];
+    if (libs.length === 1) killPoints.add(libs[0]);
+  }
+
+  const pulse = 0.72 + Math.sin((state.t || performance.now()) * 0.0065) * 0.2;
+  const glowRadius = 6.5 + pulse * 2.4;
+  const coreRadius = 2.6 + pulse * 0.8;
+  for (const point of killPoints) {
+    const [x,y,z] = point.split(',').map(Number);
+    const { sx, sy } = worldToScreen(x, y, z * FLOWER_VERTICAL_SPACING);
+    ctx.beginPath();
+    ctx.fillStyle = `rgba(255, 73, 73, ${0.24 + pulse * 0.3})`;
+    ctx.arc(sx, sy, glowRadius, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.fillStyle = `rgba(255, 178, 178, ${0.82 + pulse * 0.14})`;
+    ctx.arc(sx, sy, coreRadius, 0, Math.PI * 2);
+    ctx.fill();
+  }
+}
+
 function syncNeutralToggles(){
-  if (!ui.showNeutralsToggle || !ui.showOpponentCanopyGapsToggle) return;
+  if (!ui.showNeutralsToggle || !ui.showOpponentCanopyGapsToggle || !ui.showOpponentVulnerabilitiesToggle) return;
   const enabled = ui.showNeutralsToggle.checked;
   ui.showOpponentCanopyGapsToggle.disabled = !enabled;
+  ui.showOpponentVulnerabilitiesToggle.disabled = !enabled;
   if (!enabled) ui.showOpponentCanopyGapsToggle.checked = false;
+  if (!enabled) ui.showOpponentVulnerabilitiesToggle.checked = false;
 }
 
 function draw(){
@@ -821,8 +820,9 @@ function draw(){
   for(const {tid,pos} of orderedTiles){
     drawTile(pos, state.phase==='selectTile'&&state.legalMoves.some(m=>m.tid===tid), state.hoverTileId===tid || state.selectedTileId===tid);
   }
-  if (ui.showNeutralsToggle?.checked || state.hoverNeutralPlacement) drawNeutralAssist();
+  if (ui.showNeutralsToggle?.checked) drawNeutralAssist();
   if (ui.showNeutralsToggle?.checked && ui.showOpponentCanopyGapsToggle?.checked) drawOpponentCanopyGaps();
+  if (ui.showNeutralsToggle?.checked && ui.showOpponentVulnerabilitiesToggle?.checked) drawOpponentVulnerabilities();
   drawVineConnections();
   for(const {pos} of orderedTiles){
     const stack=state.stacks.get(key(pos.x,pos.y))||[]; const {sx,sy}=worldToScreen(pos.x,pos.y);
@@ -1172,3 +1172,4 @@ requestAnimationFrame(tick);
 window.addEventListener('resize', ()=>{ resizeCanvas(); if (!state.camera.userAdjusted) fitCameraToBoard(); draw(); });
 if (ui.showNeutralsToggle) ui.showNeutralsToggle.addEventListener('change', ()=>{ syncNeutralToggles(); draw(); });
 if (ui.showOpponentCanopyGapsToggle) ui.showOpponentCanopyGapsToggle.addEventListener('change', ()=>draw());
+if (ui.showOpponentVulnerabilitiesToggle) ui.showOpponentVulnerabilitiesToggle.addEventListener('change', ()=>draw());
