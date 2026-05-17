@@ -358,7 +358,7 @@ function activeTurnHighlight(){
     : { solid: 'rgba(122,60,255,0.85)', ghost: 'rgba(122,60,255,0.45)' };
 }
 
-const FLOWER_VERTICAL_SPACING = 22;
+const FLOWER_VERTICAL_SPACING = 66;
 
 function drawVineConnections(){
   const tNow = (state.t || performance.now()) * 0.001;
