@@ -615,6 +615,14 @@ function nearestPlayableNeutral(mx, my){
   return bestScore < 1 ? best : null;
 }
 
+
+function tileIdAtCoordinate(x, y){
+  for (const [tid, pos] of state.tiles) {
+    if (pos.x === x && pos.y === y) return tid;
+  }
+  return null;
+}
+
 function drawNeutralAssist(){
   let tallestStack = 0;
   for (const stack of state.stacks.values()) tallestStack = Math.max(tallestStack, stack.length);
@@ -958,6 +966,7 @@ function handleBoardClick(mx,my){
       state.phase = 'selectTile';
       state.selectedTileId = null;
       state.hoverPlaceTileId = null;
+    state.hoverNeutralPlacement = null;
       refresh();
       return;
     }
@@ -974,8 +983,8 @@ function handleBoardClick(mx,my){
   if(state.phase==='place'){
     const neutral = nearestPlayableNeutral(mx, my);
     if (neutral) {
-      const tileEntry = [...state.tiles.entries()].find(([, pos])=>pos.x===neutral.x && pos.y===neutral.y);
-      if (tileEntry) placeFlowerOnTile(tileEntry[0]);
+      const neutralTileId = tileIdAtCoordinate(neutral.x, neutral.y);
+      if (neutralTileId) placeFlowerOnTile(neutralTileId);
       return;
     }
     const t=nearestTile(mx,my); if(!t) return;
@@ -1031,7 +1040,8 @@ canvas.addEventListener('mousemove', (e)=>{
   const tile = nearestTile(mx,my);
   const neutral = nearestPlayableNeutral(mx, my);
   const nextHoverTileId = (state.phase === 'selectTile' || state.phase === 'place') ? (tile ? tile.tid : null) : null;
-  const nextHoverPlaceTileId = state.phase === 'place' ? (tile ? tile.tid : null) : null;
+  const neutralTileId = neutral ? tileIdAtCoordinate(neutral.x, neutral.y) : null;
+  const nextHoverPlaceTileId = state.phase === 'place' ? (neutralTileId || (tile ? tile.tid : null)) : null;
   const neutralChanged = JSON.stringify(state.hoverNeutralPlacement) !== JSON.stringify(neutral);
   if (nextHoverTileId !== state.hoverTileId || nextHoverPlaceTileId !== state.hoverPlaceTileId || neutralChanged) {
     state.hoverTileId = nextHoverTileId;
@@ -1110,8 +1120,9 @@ if (ui.mobileFlowerIcon) {
   const dragMove = (clientX, clientY)=>{
     const { mx, my } = canvasPointFromClient(clientX, clientY);
     const neutral = nearestPlayableNeutral(mx, my);
-    const tile = neutral ? [...state.tiles.entries()].find(([, pos])=>pos.x===neutral.x && pos.y===neutral.y) : nearestTile(mx, my);
-    state.mobilePlaceDrag.snappedTileId = tile ? tile[0] || tile.tid : null;
+    const neutralTileId = neutral ? tileIdAtCoordinate(neutral.x, neutral.y) : null;
+    const tile = nearestTile(mx, my);
+    state.mobilePlaceDrag.snappedTileId = neutralTileId || (tile ? tile.tid : null);
     state.hoverNeutralPlacement = neutral;
     state.hoverPlaceTileId = state.mobilePlaceDrag.snappedTileId;
     draw();
@@ -1135,6 +1146,7 @@ if (ui.mobileFlowerIcon) {
     const dropTileId = state.mobilePlaceDrag.snappedTileId;
     state.mobilePlaceDrag.snappedTileId = null;
     state.hoverPlaceTileId = null;
+    state.hoverNeutralPlacement = null;
     if (dropTileId) placeFlowerOnTile(dropTileId);
     else draw();
   });
@@ -1142,6 +1154,7 @@ if (ui.mobileFlowerIcon) {
     state.mobilePlaceDrag.active = false;
     state.mobilePlaceDrag.snappedTileId = null;
     state.hoverPlaceTileId = null;
+    state.hoverNeutralPlacement = null;
     draw();
   });
 }
