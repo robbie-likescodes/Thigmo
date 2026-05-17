@@ -87,6 +87,20 @@ canvas { touch-action: none; }
 button { border:1px solid #9da78a; background:#fff9ef; border-radius:10px; padding:6px 11px; cursor:pointer; color:#2f3e27; }
 button:hover { background:#f4f8e8; }
 label { display:flex; align-items:center; gap:6px; }
+.toggle-row {
+  margin-top: 10px;
+  font-weight: 600;
+  user-select: none;
+}
+.toggle-row input {
+  width: 16px;
+  height: 16px;
+}
+.toggle-subrow {
+  margin-top: 6px;
+  margin-left: 18px;
+  font-weight: 500;
+}
 canvas { display:block; }
 .mobile-flower-dock {
   position: absolute;

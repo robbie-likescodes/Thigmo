@@ -19,6 +19,9 @@ const ui = {
   winAnnouncement: document.getElementById('win-announcement'), replayBtn: document.getElementById('replay-btn'),
   mobileFlowerDock: document.getElementById('mobile-flower-dock'),
   mobileFlowerIcon: document.getElementById('mobile-flower-icon'),
+  showNeutralsToggle: document.getElementById('show-neutrals-toggle'),
+  showOpponentCanopyGapsToggle: document.getElementById('show-opponent-canopy-gaps-toggle'),
+  showOpponentVulnerabilitiesToggle: document.getElementById('show-opponent-vulnerabilities-toggle'),
 };
 
 const state = {
@@ -586,6 +589,112 @@ function projectedTileRadius(x, y){
   return Math.max(20, r * 0.62);
 }
 
+function drawNeutralAssist(){
+  let tallestStack = 0;
+  for (const stack of state.stacks.values()) tallestStack = Math.max(tallestStack, stack.length);
+  const lifeTier = tallestStack + 1;
+  const pulse = 0.72 + Math.sin((state.t || performance.now()) * 0.005) * 0.16;
+  const glowRadius = 6 + pulse * 2.2;
+  const coreRadius = 2.4 + pulse * 0.7;
+
+  for (const [, pos] of state.tiles) {
+    const stackHeight = (state.stacks.get(key(pos.x, pos.y)) || []).length;
+    for (let z = stackHeight; z < lifeTier; z++) {
+      const { sx, sy } = worldToScreen(pos.x, pos.y, z * FLOWER_VERTICAL_SPACING);
+      ctx.beginPath();
+      ctx.fillStyle = `rgba(70, 175, 255, ${0.2 + pulse * 0.28})`;
+      ctx.arc(sx, sy, glowRadius, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.fillStyle = `rgba(152, 220, 255, ${0.82 + pulse * 0.12})`;
+      ctx.arc(sx, sy, coreRadius, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+}
+
+function drawOpponentCanopyGaps(){
+  const opponent = other(state.turn);
+  const occupancy = getOccupancy();
+  let tallestOpponentStack = 0;
+  for (const stack of state.stacks.values()) {
+    if (!stack.includes(opponent)) continue;
+    tallestOpponentStack = Math.max(tallestOpponentStack, stack.length);
+  }
+  const lifeTier = tallestOpponentStack + 1;
+  if (lifeTier <= 0) return;
+
+  const pulse = 0.72 + Math.sin((state.t || performance.now()) * 0.006) * 0.16;
+  const glowRadius = (6.2 + pulse * 2.2) * 1.3;
+  const coreRadius = (2.4 + pulse * 0.7) * 1.3;
+
+  for (const [, pos] of state.tiles) {
+    const stackHeight = (state.stacks.get(key(pos.x, pos.y)) || []).length;
+    for (let z = stackHeight; z < lifeTier; z++) {
+      const neutralKey = cellKey(pos.x, pos.y, z);
+      let touchesOpponent = false;
+      for (const [nx, ny, nz] of neighbors6(pos.x, pos.y, z)) {
+        if (nz < 0) continue;
+        if ((nx !== pos.x || ny !== pos.y) && !hasTile(nx, ny)) continue;
+        if (occupancy.get(cellKey(nx, ny, nz)) === opponent) {
+          touchesOpponent = true;
+          break;
+        }
+      }
+      if (!touchesOpponent) continue;
+
+      const { sx, sy } = worldToScreen(pos.x, pos.y, z * FLOWER_VERTICAL_SPACING);
+      ctx.beginPath();
+      ctx.fillStyle = `rgba(255, 208, 77, ${0.2 + pulse * 0.28})`;
+      ctx.arc(sx, sy, glowRadius, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.fillStyle = `rgba(255, 240, 164, ${0.82 + pulse * 0.12})`;
+      ctx.arc(sx, sy, coreRadius, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+}
+
+function drawOpponentVulnerabilities(){
+  const opponent = other(state.turn);
+  const occ = getOccupancy();
+  const seen = new Set();
+  const killPoints = new Set();
+  for (const cell of occ.keys()) {
+    if (seen.has(cell) || occ.get(cell) !== opponent) continue;
+    const group = groupFrom(cell, occ);
+    group.forEach((c)=>seen.add(c));
+    const libs = [...liberties(group, occ)];
+    if (libs.length === 1) killPoints.add(libs[0]);
+  }
+
+  const pulse = 0.72 + Math.sin((state.t || performance.now()) * 0.0065) * 0.2;
+  const glowRadius = 6.5 + pulse * 2.4;
+  const coreRadius = 2.6 + pulse * 0.8;
+  for (const point of killPoints) {
+    const [x,y,z] = point.split(',').map(Number);
+    const { sx, sy } = worldToScreen(x, y, z * FLOWER_VERTICAL_SPACING);
+    ctx.beginPath();
+    ctx.fillStyle = `rgba(255, 73, 73, ${0.24 + pulse * 0.3})`;
+    ctx.arc(sx, sy, glowRadius, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.fillStyle = `rgba(255, 178, 178, ${0.82 + pulse * 0.14})`;
+    ctx.arc(sx, sy, coreRadius, 0, Math.PI * 2);
+    ctx.fill();
+  }
+}
+
+function syncNeutralToggles(){
+  if (!ui.showNeutralsToggle || !ui.showOpponentCanopyGapsToggle || !ui.showOpponentVulnerabilitiesToggle) return;
+  const enabled = ui.showNeutralsToggle.checked;
+  ui.showOpponentCanopyGapsToggle.disabled = !enabled;
+  ui.showOpponentVulnerabilitiesToggle.disabled = !enabled;
+  if (!enabled) ui.showOpponentCanopyGapsToggle.checked = false;
+  if (!enabled) ui.showOpponentVulnerabilitiesToggle.checked = false;
+}
+
 function draw(){
   pruneWiltingEffects();
   ctx.clearRect(0,0,canvas.width,canvas.height);
@@ -710,6 +819,9 @@ function draw(){
   for(const {tid,pos} of orderedTiles){
     drawTile(pos, state.phase==='selectTile'&&state.legalMoves.some(m=>m.tid===tid), state.hoverTileId===tid || state.selectedTileId===tid);
   }
+  if (ui.showNeutralsToggle?.checked) drawNeutralAssist();
+  if (ui.showNeutralsToggle?.checked && ui.showOpponentCanopyGapsToggle?.checked) drawOpponentCanopyGaps();
+  if (ui.showNeutralsToggle?.checked && ui.showOpponentVulnerabilitiesToggle?.checked) drawOpponentVulnerabilities();
   drawVineConnections();
   for(const {pos} of orderedTiles){
     const stack=state.stacks.get(key(pos.x,pos.y))||[]; const {sx,sy}=worldToScreen(pos.x,pos.y);
@@ -1026,6 +1138,10 @@ function tick(ts){ state.t=ts; draw(); requestAnimationFrame(tick); }
 log('Thigmo botanical battlefield loaded.');
 resizeCanvas();
 init();
+syncNeutralToggles();
 requestAnimationFrame(tick);
 
 window.addEventListener('resize', ()=>{ resizeCanvas(); if (!state.camera.userAdjusted) fitCameraToBoard(); draw(); });
+if (ui.showNeutralsToggle) ui.showNeutralsToggle.addEventListener('change', ()=>{ syncNeutralToggles(); draw(); });
+if (ui.showOpponentCanopyGapsToggle) ui.showOpponentCanopyGapsToggle.addEventListener('change', ()=>draw());
+if (ui.showOpponentVulnerabilitiesToggle) ui.showOpponentVulnerabilitiesToggle.addEventListener('change', ()=>draw());
