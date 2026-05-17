@@ -40,6 +40,7 @@ const state = {
   drag: { active: false, moved: false, startX: 0, startY: 0, startYaw: 0, startPitch: 0 },
   hoverTileId: null,
   hoverPlaceTileId: null,
+  hoverNeutralPlacement: null,
   touch: { mode: 'none', startX: 0, startY: 0, startYaw: 0, startPitch: 0, moved: false, pinchDist: 0, pinchZoom: 1, suppressClickUntil: 0 },
   mobilePlaceDrag: { active: false, snappedTileId: null },
   isAnimating: false,
@@ -359,7 +360,7 @@ function activeTurnHighlight(){
     : { solid: 'rgba(122,60,255,0.85)', ghost: 'rgba(122,60,255,0.45)' };
 }
 
-const FLOWER_VERTICAL_SPACING = 22;
+const FLOWER_VERTICAL_SPACING = 66;
 
 function drawVineConnections(){
   const tNow = (state.t || performance.now()) * 0.001;
@@ -803,6 +804,17 @@ function draw(){
         ctx.restore();
       }
     }
+    if (state.phase === 'place') {
+      const z = stack.length;
+      const hovered = state.hoverNeutralPlacement && state.hoverNeutralPlacement.x === pos.x && state.hoverNeutralPlacement.y === pos.y && state.hoverNeutralPlacement.z === z;
+      if (ui.showNeutralsToggle?.checked || hovered) {
+        const { sx: nsx, sy: nsy } = worldToScreen(pos.x, pos.y, z * FLOWER_VERTICAL_SPACING);
+        ctx.beginPath();
+        ctx.fillStyle = hovered ? 'rgba(118, 227, 255, 0.95)' : 'rgba(172, 235, 255, 0.7)';
+        ctx.arc(nsx, nsy, hovered ? 6.8 : 4.8, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
     if(stack.length>=6){ ctx.fillStyle='rgba(255,255,255,.85)'; ctx.font='bold 14px Inter'; ctx.fillText(String(stack.length),sx+20,sy-stack.length*FLOWER_VERTICAL_SPACING); }
   }
 
@@ -922,6 +934,7 @@ function handleBoardClick(mx,my){
       state.phase = 'selectTile';
       state.selectedTileId = null;
       state.hoverPlaceTileId = null;
+    state.hoverNeutralPlacement = null;
       refresh();
       return;
     }
@@ -936,6 +949,12 @@ function handleBoardClick(mx,my){
     state.phase='place'; state.hoverPlaceTileId=null; ensureCoordinateVisible(p.x, p.y); log(`${state.turn} moved tile to (${p.x}, ${p.y})`); refresh(); return;
   }
   if(state.phase==='place'){
+    const neutral = nearestPlayableNeutral(mx, my);
+    if (neutral) {
+      const neutralTileId = tileIdAtCoordinate(neutral.x, neutral.y);
+      if (neutralTileId) placeFlowerOnTile(neutralTileId);
+      return;
+    }
     const t=nearestTile(mx,my); if(!t) return;
     placeFlowerOnTile(t.tid);
   }
@@ -951,7 +970,7 @@ async function placeFlowerOnTile(tileId){
   state.turn = other(state.turn);
   if(state.openingRound>0) state.openingRound -= 1;
   state.isAnimating = false;
-  state.phase='selectTile'; state.selectedTileId=null; state.hoverPlaceTileId=null; refresh();
+  state.phase='selectTile'; state.selectedTileId=null; state.hoverPlaceTileId=null; state.hoverNeutralPlacement=null; refresh();
 }
 
 
@@ -987,11 +1006,15 @@ canvas.addEventListener('mousemove', (e)=>{
   const mx=(e.clientX-rect.left)*(canvas.width/rect.width);
   const my=(e.clientY-rect.top)*(canvas.height/rect.height);
   const tile = nearestTile(mx,my);
+  const neutral = nearestPlayableNeutral(mx, my);
   const nextHoverTileId = (state.phase === 'selectTile' || state.phase === 'place') ? (tile ? tile.tid : null) : null;
-  const nextHoverPlaceTileId = state.phase === 'place' ? (tile ? tile.tid : null) : null;
-  if (nextHoverTileId !== state.hoverTileId || nextHoverPlaceTileId !== state.hoverPlaceTileId) {
+  const neutralTileId = neutral ? tileIdAtCoordinate(neutral.x, neutral.y) : null;
+  const nextHoverPlaceTileId = state.phase === 'place' ? (neutralTileId || (tile ? tile.tid : null)) : null;
+  const neutralChanged = JSON.stringify(state.hoverNeutralPlacement) !== JSON.stringify(neutral);
+  if (nextHoverTileId !== state.hoverTileId || nextHoverPlaceTileId !== state.hoverPlaceTileId || neutralChanged) {
     state.hoverTileId = nextHoverTileId;
     state.hoverPlaceTileId = nextHoverPlaceTileId;
+    state.hoverNeutralPlacement = neutral;
     draw();
   }
 });
@@ -1064,8 +1087,11 @@ canvas.addEventListener('touchend', (e)=>{
 if (ui.mobileFlowerIcon) {
   const dragMove = (clientX, clientY)=>{
     const { mx, my } = canvasPointFromClient(clientX, clientY);
+    const neutral = nearestPlayableNeutral(mx, my);
+    const neutralTileId = neutral ? tileIdAtCoordinate(neutral.x, neutral.y) : null;
     const tile = nearestTile(mx, my);
-    state.mobilePlaceDrag.snappedTileId = tile ? tile.tid : null;
+    state.mobilePlaceDrag.snappedTileId = neutralTileId || (tile ? tile.tid : null);
+    state.hoverNeutralPlacement = neutral;
     state.hoverPlaceTileId = state.mobilePlaceDrag.snappedTileId;
     draw();
   };
@@ -1088,6 +1114,7 @@ if (ui.mobileFlowerIcon) {
     const dropTileId = state.mobilePlaceDrag.snappedTileId;
     state.mobilePlaceDrag.snappedTileId = null;
     state.hoverPlaceTileId = null;
+    state.hoverNeutralPlacement = null;
     if (dropTileId) placeFlowerOnTile(dropTileId);
     else draw();
   });
@@ -1095,6 +1122,7 @@ if (ui.mobileFlowerIcon) {
     state.mobilePlaceDrag.active = false;
     state.mobilePlaceDrag.snappedTileId = null;
     state.hoverPlaceTileId = null;
+    state.hoverNeutralPlacement = null;
     draw();
   });
 }
