@@ -687,12 +687,16 @@ function drawOpponentVulnerabilities(){
 }
 
 function syncNeutralToggles(){
-  if (!ui.showNeutralsToggle || !ui.showOpponentCanopyGapsToggle || !ui.showOpponentVulnerabilitiesToggle) return;
+  if (!ui.showNeutralsToggle) return;
   const enabled = ui.showNeutralsToggle.checked;
-  ui.showOpponentCanopyGapsToggle.disabled = !enabled;
-  ui.showOpponentVulnerabilitiesToggle.disabled = !enabled;
-  if (!enabled) ui.showOpponentCanopyGapsToggle.checked = false;
-  if (!enabled) ui.showOpponentVulnerabilitiesToggle.checked = false;
+  if (ui.showOpponentCanopyGapsToggle) {
+    ui.showOpponentCanopyGapsToggle.disabled = !enabled;
+    if (!enabled) ui.showOpponentCanopyGapsToggle.checked = false;
+  }
+  if (ui.showOpponentVulnerabilitiesToggle) {
+    ui.showOpponentVulnerabilitiesToggle.disabled = !enabled;
+    if (!enabled) ui.showOpponentVulnerabilitiesToggle.checked = false;
+  }
 }
 
 function draw(){
