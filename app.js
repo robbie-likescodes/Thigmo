@@ -614,6 +614,7 @@ function drawNeutralAssist(){
 
 function drawOpponentCanopyGaps(){
   const opponent = other(state.turn);
+  const occupancy = getOccupancy();
   let tallestOpponentStack = 0;
   for (const stack of state.stacks.values()) {
     if (!stack.includes(opponent)) continue;
@@ -627,10 +628,20 @@ function drawOpponentCanopyGaps(){
   const coreRadius = 2.4 + pulse * 0.7;
 
   for (const [, pos] of state.tiles) {
-    const stack = state.stacks.get(key(pos.x, pos.y)) || [];
-    if (!stack.includes(opponent)) continue;
-    const stackHeight = stack.length;
+    const stackHeight = (state.stacks.get(key(pos.x, pos.y)) || []).length;
     for (let z = stackHeight; z < lifeTier; z++) {
+      const neutralKey = cellKey(pos.x, pos.y, z);
+      let touchesOpponent = false;
+      for (const [nx, ny, nz] of neighbors6(pos.x, pos.y, z)) {
+        if (nz < 0) continue;
+        if ((nx !== pos.x || ny !== pos.y) && !hasTile(nx, ny)) continue;
+        if (occupancy.get(cellKey(nx, ny, nz)) === opponent) {
+          touchesOpponent = true;
+          break;
+        }
+      }
+      if (!touchesOpponent) continue;
+
       const { sx, sy } = worldToScreen(pos.x, pos.y, z * FLOWER_VERTICAL_SPACING);
       ctx.beginPath();
       ctx.fillStyle = `rgba(255, 208, 77, ${0.2 + pulse * 0.28})`;
