@@ -19,6 +19,7 @@ const ui = {
   winAnnouncement: document.getElementById('win-announcement'), replayBtn: document.getElementById('replay-btn'),
   mobileFlowerDock: document.getElementById('mobile-flower-dock'),
   mobileFlowerIcon: document.getElementById('mobile-flower-icon'),
+  showNeutralsToggle: document.getElementById('show-neutrals-toggle'),
 };
 
 const state = {
@@ -586,6 +587,30 @@ function projectedTileRadius(x, y){
   return Math.max(20, r * 0.62);
 }
 
+function drawNeutralAssist(){
+  let tallestStack = 0;
+  for (const stack of state.stacks.values()) tallestStack = Math.max(tallestStack, stack.length);
+  const lifeTier = tallestStack + 1;
+  const pulse = 0.72 + Math.sin((state.t || performance.now()) * 0.005) * 0.16;
+  const glowRadius = 6 + pulse * 2.2;
+  const coreRadius = 2.4 + pulse * 0.7;
+
+  for (const [, pos] of state.tiles) {
+    const stackHeight = (state.stacks.get(key(pos.x, pos.y)) || []).length;
+    for (let z = stackHeight; z < lifeTier; z++) {
+      const { sx, sy } = worldToScreen(pos.x, pos.y, z * FLOWER_VERTICAL_SPACING);
+      ctx.beginPath();
+      ctx.fillStyle = `rgba(70, 175, 255, ${0.2 + pulse * 0.28})`;
+      ctx.arc(sx, sy, glowRadius, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.fillStyle = `rgba(152, 220, 255, ${0.82 + pulse * 0.12})`;
+      ctx.arc(sx, sy, coreRadius, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+}
+
 function draw(){
   pruneWiltingEffects();
   ctx.clearRect(0,0,canvas.width,canvas.height);
@@ -710,6 +735,7 @@ function draw(){
   for(const {tid,pos} of orderedTiles){
     drawTile(pos, state.phase==='selectTile'&&state.legalMoves.some(m=>m.tid===tid), state.hoverTileId===tid || state.selectedTileId===tid);
   }
+  if (ui.showNeutralsToggle?.checked) drawNeutralAssist();
   drawVineConnections();
   for(const {pos} of orderedTiles){
     const stack=state.stacks.get(key(pos.x,pos.y))||[]; const {sx,sy}=worldToScreen(pos.x,pos.y);
@@ -1029,3 +1055,4 @@ init();
 requestAnimationFrame(tick);
 
 window.addEventListener('resize', ()=>{ resizeCanvas(); if (!state.camera.userAdjusted) fitCameraToBoard(); draw(); });
+if (ui.showNeutralsToggle) ui.showNeutralsToggle.addEventListener('change', ()=>draw());
