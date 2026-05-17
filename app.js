@@ -40,6 +40,7 @@ const state = {
   drag: { active: false, moved: false, startX: 0, startY: 0, startYaw: 0, startPitch: 0 },
   hoverTileId: null,
   hoverPlaceTileId: null,
+  hoverNeutralPlacement: null,
   touch: { mode: 'none', startX: 0, startY: 0, startYaw: 0, startPitch: 0, moved: false, pinchDist: 0, pinchZoom: 1, suppressClickUntil: 0 },
   mobilePlaceDrag: { active: false, snappedTileId: null },
   isAnimating: false,
@@ -588,6 +589,32 @@ function projectedTileRadius(x, y){
   return Math.max(20, r * 0.62);
 }
 
+
+function playableNeutralNodes(){
+  const nodes = [];
+  for (const [, pos] of state.tiles) {
+    const stackHeight = (state.stacks.get(key(pos.x, pos.y)) || []).length;
+    nodes.push({ x: pos.x, y: pos.y, z: stackHeight });
+  }
+  return nodes;
+}
+
+function nearestPlayableNeutral(mx, my){
+  if (state.phase !== 'place') return null;
+  let best = null;
+  let bestScore = 1e9;
+  for (const node of playableNeutralNodes()) {
+    const c = worldToScreen(node.x, node.y, node.z * FLOWER_VERTICAL_SPACING);
+    const d = Math.hypot(mx - c.sx, my - c.sy);
+    const score = d / Math.max(12, projectedTileRadius(node.x, node.y) * 0.42);
+    if (score < bestScore) {
+      bestScore = score;
+      best = node;
+    }
+  }
+  return bestScore < 1 ? best : null;
+}
+
 function drawNeutralAssist(){
   let tallestStack = 0;
   for (const stack of state.stacks.values()) tallestStack = Math.max(tallestStack, stack.length);
@@ -786,7 +813,7 @@ function draw(){
   for(const {tid,pos} of orderedTiles){
     drawTile(pos, state.phase==='selectTile'&&state.legalMoves.some(m=>m.tid===tid), state.hoverTileId===tid || state.selectedTileId===tid);
   }
-  if (ui.showNeutralsToggle?.checked) drawNeutralAssist();
+  if (ui.showNeutralsToggle?.checked || state.hoverNeutralPlacement) drawNeutralAssist();
   if (ui.showNeutralsToggle?.checked && ui.showOpponentCanopyGapsToggle?.checked) drawOpponentCanopyGaps();
   drawVineConnections();
   for(const {pos} of orderedTiles){
@@ -799,6 +826,17 @@ function draw(){
         ctx.globalAlpha = 0.45;
         drawFlower(state.turn, pos.x, pos.y, stack.length, true);
         ctx.restore();
+      }
+    }
+    if (state.phase === 'place') {
+      const z = stack.length;
+      const hovered = state.hoverNeutralPlacement && state.hoverNeutralPlacement.x === pos.x && state.hoverNeutralPlacement.y === pos.y && state.hoverNeutralPlacement.z === z;
+      if (ui.showNeutralsToggle?.checked || hovered) {
+        const { sx: nsx, sy: nsy } = worldToScreen(pos.x, pos.y, z * FLOWER_VERTICAL_SPACING);
+        ctx.beginPath();
+        ctx.fillStyle = hovered ? 'rgba(118, 227, 255, 0.95)' : 'rgba(172, 235, 255, 0.7)';
+        ctx.arc(nsx, nsy, hovered ? 6.8 : 4.8, 0, Math.PI * 2);
+        ctx.fill();
       }
     }
     if(stack.length>=6){ ctx.fillStyle='rgba(255,255,255,.85)'; ctx.font='bold 14px Inter'; ctx.fillText(String(stack.length),sx+20,sy-stack.length*FLOWER_VERTICAL_SPACING); }
@@ -934,6 +972,12 @@ function handleBoardClick(mx,my){
     state.phase='place'; state.hoverPlaceTileId=null; ensureCoordinateVisible(p.x, p.y); log(`${state.turn} moved tile to (${p.x}, ${p.y})`); refresh(); return;
   }
   if(state.phase==='place'){
+    const neutral = nearestPlayableNeutral(mx, my);
+    if (neutral) {
+      const tileEntry = [...state.tiles.entries()].find(([, pos])=>pos.x===neutral.x && pos.y===neutral.y);
+      if (tileEntry) placeFlowerOnTile(tileEntry[0]);
+      return;
+    }
     const t=nearestTile(mx,my); if(!t) return;
     placeFlowerOnTile(t.tid);
   }
@@ -949,7 +993,7 @@ async function placeFlowerOnTile(tileId){
   state.turn = other(state.turn);
   if(state.openingRound>0) state.openingRound -= 1;
   state.isAnimating = false;
-  state.phase='selectTile'; state.selectedTileId=null; state.hoverPlaceTileId=null; refresh();
+  state.phase='selectTile'; state.selectedTileId=null; state.hoverPlaceTileId=null; state.hoverNeutralPlacement=null; refresh();
 }
 
 
@@ -985,11 +1029,14 @@ canvas.addEventListener('mousemove', (e)=>{
   const mx=(e.clientX-rect.left)*(canvas.width/rect.width);
   const my=(e.clientY-rect.top)*(canvas.height/rect.height);
   const tile = nearestTile(mx,my);
+  const neutral = nearestPlayableNeutral(mx, my);
   const nextHoverTileId = (state.phase === 'selectTile' || state.phase === 'place') ? (tile ? tile.tid : null) : null;
   const nextHoverPlaceTileId = state.phase === 'place' ? (tile ? tile.tid : null) : null;
-  if (nextHoverTileId !== state.hoverTileId || nextHoverPlaceTileId !== state.hoverPlaceTileId) {
+  const neutralChanged = JSON.stringify(state.hoverNeutralPlacement) !== JSON.stringify(neutral);
+  if (nextHoverTileId !== state.hoverTileId || nextHoverPlaceTileId !== state.hoverPlaceTileId || neutralChanged) {
     state.hoverTileId = nextHoverTileId;
     state.hoverPlaceTileId = nextHoverPlaceTileId;
+    state.hoverNeutralPlacement = neutral;
     draw();
   }
 });
@@ -1062,8 +1109,10 @@ canvas.addEventListener('touchend', (e)=>{
 if (ui.mobileFlowerIcon) {
   const dragMove = (clientX, clientY)=>{
     const { mx, my } = canvasPointFromClient(clientX, clientY);
-    const tile = nearestTile(mx, my);
-    state.mobilePlaceDrag.snappedTileId = tile ? tile.tid : null;
+    const neutral = nearestPlayableNeutral(mx, my);
+    const tile = neutral ? [...state.tiles.entries()].find(([, pos])=>pos.x===neutral.x && pos.y===neutral.y) : nearestTile(mx, my);
+    state.mobilePlaceDrag.snappedTileId = tile ? tile[0] || tile.tid : null;
+    state.hoverNeutralPlacement = neutral;
     state.hoverPlaceTileId = state.mobilePlaceDrag.snappedTileId;
     draw();
   };
